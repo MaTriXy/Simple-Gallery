@@ -1,31 +1,30 @@
 package com.simplemobiletools.gallery.pro.dialogs
 
 import android.view.ViewGroup
-import android.widget.RadioButton
 import android.widget.RadioGroup
-import androidx.appcompat.app.AlertDialog
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
+import com.simplemobiletools.commons.databinding.RadioButtonBinding
 import com.simplemobiletools.commons.extensions.beVisibleIf
+import com.simplemobiletools.commons.extensions.getAlertDialogBuilder
 import com.simplemobiletools.commons.extensions.getBasePath
 import com.simplemobiletools.commons.extensions.setupDialogStuff
-import com.simplemobiletools.gallery.pro.R
+import com.simplemobiletools.gallery.pro.databinding.DialogExcludeFolderBinding
 import com.simplemobiletools.gallery.pro.extensions.config
-import kotlinx.android.synthetic.main.dialog_exclude_folder.view.*
 
 class ExcludeFolderDialog(val activity: BaseSimpleActivity, val selectedPaths: List<String>, val callback: () -> Unit) {
-    val alternativePaths = getAlternativePathsList()
-    var radioGroup: RadioGroup? = null
+    private val alternativePaths = getAlternativePathsList()
+    private var radioGroup: RadioGroup? = null
 
     init {
-        val view = activity.layoutInflater.inflate(R.layout.dialog_exclude_folder, null).apply {
-            exclude_folder_parent.beVisibleIf(alternativePaths.size > 1)
+        val binding = DialogExcludeFolderBinding.inflate(activity.layoutInflater).apply {
+            excludeFolderParent.beVisibleIf(alternativePaths.size > 1)
 
-            radioGroup = exclude_folder_radio_group
-            exclude_folder_radio_group.beVisibleIf(alternativePaths.size > 1)
+            radioGroup = excludeFolderRadioGroup
+            excludeFolderRadioGroup.beVisibleIf(alternativePaths.size > 1)
         }
 
         alternativePaths.forEachIndexed { index, value ->
-            val radioButton = (activity.layoutInflater.inflate(R.layout.radio_button, null) as RadioButton).apply {
+            val radioButton = RadioButtonBinding.inflate(activity.layoutInflater).root.apply {
                 text = alternativePaths[index]
                 isChecked = index == 0
                 id = index
@@ -33,12 +32,12 @@ class ExcludeFolderDialog(val activity: BaseSimpleActivity, val selectedPaths: L
             radioGroup!!.addView(radioButton, RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
 
-        AlertDialog.Builder(activity)
-                .setPositiveButton(R.string.ok) { dialog, which -> dialogConfirmed() }
-                .setNegativeButton(R.string.cancel, null)
-                .create().apply {
-                    activity.setupDialogStuff(view, this)
-                }
+        activity.getAlertDialogBuilder()
+            .setPositiveButton(com.simplemobiletools.commons.R.string.ok) { dialog, which -> dialogConfirmed() }
+            .setNegativeButton(com.simplemobiletools.commons.R.string.cancel, null)
+            .apply {
+                activity.setupDialogStuff(binding.root, this)
+            }
     }
 
     private fun dialogConfirmed() {

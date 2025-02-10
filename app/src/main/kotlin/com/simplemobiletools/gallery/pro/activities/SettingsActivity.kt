@@ -1,10 +1,11 @@
 package com.simplemobiletools.gallery.pro.activities
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.Menu
+import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.simplemobiletools.commons.dialogs.*
@@ -12,51 +13,66 @@ import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.*
 import com.simplemobiletools.commons.models.RadioItem
 import com.simplemobiletools.gallery.pro.R
-import com.simplemobiletools.gallery.pro.dialogs.ManageBottomActionsDialog
-import com.simplemobiletools.gallery.pro.dialogs.ManageExtendedDetailsDialog
+import com.simplemobiletools.gallery.pro.databinding.ActivitySettingsBinding
+import com.simplemobiletools.gallery.pro.dialogs.*
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.models.AlbumCover
-import kotlinx.android.synthetic.main.activity_settings.*
 import java.io.File
 import java.io.InputStream
-import java.util.*
+import java.io.OutputStream
+import java.util.Locale
+import kotlin.system.exitProcess
 
 class SettingsActivity : SimpleActivity() {
-    private val PICK_IMPORT_SOURCE_INTENT = 1
+    companion object {
+        private const val PICK_IMPORT_SOURCE_INTENT = 1
+        private const val SELECT_EXPORT_FAVORITES_FILE_INTENT = 2
+        private const val SELECT_IMPORT_FAVORITES_FILE_INTENT = 3
+    }
+
     private var mRecycleBinContentSize = 0L
+    private val binding by viewBinding(ActivitySettingsBinding::inflate)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        isMaterialActivity = true
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_settings)
+        setContentView(binding.root)
+
+        updateMaterialActivityViews(binding.settingsCoordinator, binding.settingsHolder, useTransparentNavigation = true, useTopSearchMenu = false)
+        setupMaterialScrollListener(binding.settingsNestedScrollview, binding.settingsToolbar)
     }
 
     override fun onResume() {
         super.onResume()
+        setupToolbar(binding.settingsToolbar, NavigationIcon.Arrow)
         setupSettingItems()
     }
 
     private fun setupSettingItems() {
         setupCustomizeColors()
         setupUseEnglish()
+        setupLanguage()
         setupChangeDateTimeFormat()
         setupFileLoadingPriority()
         setupManageIncludedFolders()
         setupManageExcludedFolders()
         setupManageHiddenFolders()
+        setupSearchAllFiles()
         setupShowHiddenItems()
         setupAutoplayVideos()
         setupRememberLastVideo()
         setupLoopVideos()
         setupOpenVideosOnSeparateScreen()
-        setupAnimateGifs()
         setupMaxBrightness()
         setupCropThumbnails()
+        setupAnimateGifs()
         setupDarkBackground()
         setupScrollHorizontally()
         setupScreenRotation()
         setupHideSystemUI()
         setupHiddenItemPasswordProtection()
+        setupExcludedItemPasswordProtection()
         setupAppPasswordProtection()
         setupFileDeletionPasswordProtection()
         setupDeleteEmptyFolders()
@@ -66,11 +82,9 @@ class SettingsActivity : SimpleActivity() {
         setupAllowRotatingWithGestures()
         setupShowNotch()
         setupBottomActions()
-        setupThumbnailVideoDuration()
-        setupThumbnailFileTypes()
-        setupShowMediaCount()
+        setupFileThumbnailStyle()
+        setupFolderThumbnailStyle()
         setupKeepLastModified()
-        setupShowInfoBubble()
         setupEnablePullToRefresh()
         setupAllowZoomingImages()
         setupShowHighestQuality()
@@ -85,16 +99,30 @@ class SettingsActivity : SimpleActivity() {
         setupShowRecycleBin()
         setupShowRecycleBinLast()
         setupEmptyRecycleBin()
-        updateTextColors(settings_holder)
-        setupSectionColors()
+        updateTextColors(binding.settingsHolder)
+        setupClearCache()
+        setupExportFavorites()
+        setupImportFavorites()
         setupExportSettings()
         setupImportSettings()
-        invalidateOptionsMenu()
-    }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        updateMenuItemColors(menu)
-        return super.onCreateOptionsMenu(menu)
+        arrayOf(
+            binding.settingsColorCustomizationSectionLabel,
+            binding.settingsGeneralSettingsLabel,
+            binding.settingsVideosLabel,
+            binding.settingsThumbnailsLabel,
+            binding.settingsScrollingLabel,
+            binding.settingsFullscreenMediaLabel,
+            binding.settingsDeepZoomableImagesLabel,
+            binding.settingsExtendedDetailsLabel,
+            binding.settingsSecurityLabel,
+            binding.settingsFileOperationsLabel,
+            binding.settingsBottomActionsLabel,
+            binding.settingsRecycleBinLabel,
+            binding.settingsMigratingLabel
+        ).forEach {
+            it.setTextColor(getProperPrimaryColor())
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
@@ -102,76 +130,98 @@ class SettingsActivity : SimpleActivity() {
         if (requestCode == PICK_IMPORT_SOURCE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
             val inputStream = contentResolver.openInputStream(resultData.data!!)
             parseFile(inputStream)
-        }
-    }
-
-    private fun setupSectionColors() {
-        val adjustedPrimaryColor = getAdjustedPrimaryColor()
-        arrayListOf(visibility_label, videos_label, thumbnails_label, scrolling_label, fullscreen_media_label, security_label,
-                file_operations_label, deep_zoomable_images_label, extended_details_label, bottom_actions_label, recycle_bin_label,
-                migrating_label).forEach {
-            it.setTextColor(adjustedPrimaryColor)
+        } else if (requestCode == SELECT_EXPORT_FAVORITES_FILE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
+            val outputStream = contentResolver.openOutputStream(resultData.data!!)
+            exportFavoritesTo(outputStream)
+        } else if (requestCode == SELECT_IMPORT_FAVORITES_FILE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
+            val inputStream = contentResolver.openInputStream(resultData.data!!)
+            importFavorites(inputStream)
         }
     }
 
     private fun setupCustomizeColors() {
-        settings_customize_colors_holder.setOnClickListener {
+        binding.settingsColorCustomizationHolder.setOnClickListener {
             startCustomizationActivity()
         }
     }
 
     private fun setupUseEnglish() {
-        settings_use_english_holder.beVisibleIf(config.wasUseEnglishToggled || Locale.getDefault().language != "en")
-        settings_use_english.isChecked = config.useEnglish
-        settings_use_english_holder.setOnClickListener {
-            settings_use_english.toggle()
-            config.useEnglish = settings_use_english.isChecked
-            System.exit(0)
+        binding.settingsUseEnglishHolder.beVisibleIf((config.wasUseEnglishToggled || Locale.getDefault().language != "en") && !isTiramisuPlus())
+        binding.settingsUseEnglish.isChecked = config.useEnglish
+        binding.settingsUseEnglishHolder.setOnClickListener {
+            binding.settingsUseEnglish.toggle()
+            config.useEnglish = binding.settingsUseEnglish.isChecked
+            exitProcess(0)
+        }
+    }
+
+    private fun setupLanguage() {
+        binding.settingsLanguage.text = Locale.getDefault().displayLanguage
+        binding.settingsLanguageHolder.beVisibleIf(isTiramisuPlus())
+        binding.settingsLanguageHolder.setOnClickListener {
+            launchChangeAppLanguageIntent()
         }
     }
 
     private fun setupChangeDateTimeFormat() {
-        settings_change_date_time_format_holder.setOnClickListener {
+        binding.settingsChangeDateTimeFormatHolder.setOnClickListener {
             ChangeDateTimeFormatDialog(this) {}
         }
     }
 
     private fun setupFileLoadingPriority() {
-        settings_file_loading_priority.text = getFileLoadingPriorityText()
-        settings_file_loading_priority_holder.setOnClickListener {
+        binding.settingsFileLoadingPriorityHolder.beGoneIf(isRPlus() && !isExternalStorageManager())
+        binding.settingsFileLoadingPriority.text = getFileLoadingPriorityText()
+        binding.settingsFileLoadingPriorityHolder.setOnClickListener {
             val items = arrayListOf(
-                    RadioItem(PRIORITY_SPEED, getString(R.string.speed)),
-                    RadioItem(PRIORITY_COMPROMISE, getString(R.string.compromise)),
-                    RadioItem(PRIORITY_VALIDITY, getString(R.string.avoid_showing_invalid_files)))
+                RadioItem(PRIORITY_SPEED, getString(R.string.speed)),
+                RadioItem(PRIORITY_COMPROMISE, getString(R.string.compromise)),
+                RadioItem(PRIORITY_VALIDITY, getString(R.string.avoid_showing_invalid_files))
+            )
 
             RadioGroupDialog(this@SettingsActivity, items, config.fileLoadingPriority) {
                 config.fileLoadingPriority = it as Int
-                settings_file_loading_priority.text = getFileLoadingPriorityText()
+                binding.settingsFileLoadingPriority.text = getFileLoadingPriorityText()
             }
         }
     }
 
-    private fun getFileLoadingPriorityText() = getString(when (config.fileLoadingPriority) {
-        PRIORITY_SPEED -> R.string.speed
-        PRIORITY_COMPROMISE -> R.string.compromise
-        else -> R.string.avoid_showing_invalid_files
-    })
+    private fun getFileLoadingPriorityText() = getString(
+        when (config.fileLoadingPriority) {
+            PRIORITY_SPEED -> R.string.speed
+            PRIORITY_COMPROMISE -> R.string.compromise
+            else -> R.string.avoid_showing_invalid_files
+        }
+    )
 
     private fun setupManageIncludedFolders() {
-        settings_manage_included_folders_holder.setOnClickListener {
-            startActivity(Intent(this, IncludedFoldersActivity::class.java))
+        if (isRPlus() && !isExternalStorageManager()) {
+            binding.settingsManageIncludedFolders.text =
+                "${getString(R.string.manage_included_folders)} (${getString(com.simplemobiletools.commons.R.string.no_permission)})"
+        } else {
+            binding.settingsManageIncludedFolders.setText(R.string.manage_included_folders)
+        }
+
+        binding.settingsManageIncludedFoldersHolder.setOnClickListener {
+            if (isRPlus() && !isExternalStorageManager()) {
+                GrantAllFilesDialog(this)
+            } else {
+                startActivity(Intent(this, IncludedFoldersActivity::class.java))
+            }
         }
     }
 
     private fun setupManageExcludedFolders() {
-        settings_manage_excluded_folders_holder.setOnClickListener {
-            startActivity(Intent(this, ExcludedFoldersActivity::class.java))
+        binding.settingsManageExcludedFoldersHolder.setOnClickListener {
+            handleExcludedFolderPasswordProtection {
+                startActivity(Intent(this, ExcludedFoldersActivity::class.java))
+            }
         }
     }
 
     private fun setupManageHiddenFolders() {
-        settings_manage_hidden_folders_holder.beVisibleIf(!isQPlus())
-        settings_manage_hidden_folders_holder.setOnClickListener {
+        binding.settingsManageHiddenFoldersHolder.beGoneIf(isQPlus())
+        binding.settingsManageHiddenFoldersHolder.setOnClickListener {
             handleHiddenFolderPasswordProtection {
                 startActivity(Intent(this, HiddenFoldersActivity::class.java))
             }
@@ -179,9 +229,18 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupShowHiddenItems() {
-        settings_show_hidden_items.isChecked = config.showHiddenMedia
-        settings_show_hidden_items_holder.setOnClickListener {
-            if (config.showHiddenMedia) {
+        if (isRPlus() && !isExternalStorageManager()) {
+            binding.settingsShowHiddenItems.text =
+                "${getString(com.simplemobiletools.commons.R.string.show_hidden_items)} (${getString(com.simplemobiletools.commons.R.string.no_permission)})"
+        } else {
+            binding.settingsShowHiddenItems.setText(com.simplemobiletools.commons.R.string.show_hidden_items)
+        }
+
+        binding.settingsShowHiddenItems.isChecked = config.showHiddenMedia
+        binding.settingsShowHiddenItemsHolder.setOnClickListener {
+            if (isRPlus() && !isExternalStorageManager()) {
+                GrantAllFilesDialog(this)
+            } else if (config.showHiddenMedia) {
                 toggleHiddenItems()
             } else {
                 handleHiddenFolderPasswordProtection {
@@ -192,127 +251,143 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun toggleHiddenItems() {
-        settings_show_hidden_items.toggle()
-        config.showHiddenMedia = settings_show_hidden_items.isChecked
+        binding.settingsShowHiddenItems.toggle()
+        config.showHiddenMedia = binding.settingsShowHiddenItems.isChecked
+    }
+
+    private fun setupSearchAllFiles() {
+        binding.settingsSearchAllFiles.isChecked = config.searchAllFilesByDefault
+        binding.settingsSearchAllFilesHolder.setOnClickListener {
+            binding.settingsSearchAllFiles.toggle()
+            config.searchAllFilesByDefault = binding.settingsSearchAllFiles.isChecked
+        }
     }
 
     private fun setupAutoplayVideos() {
-        settings_autoplay_videos.isChecked = config.autoplayVideos
-        settings_autoplay_videos_holder.setOnClickListener {
-            settings_autoplay_videos.toggle()
-            config.autoplayVideos = settings_autoplay_videos.isChecked
+        binding.settingsAutoplayVideos.isChecked = config.autoplayVideos
+        binding.settingsAutoplayVideosHolder.setOnClickListener {
+            binding.settingsAutoplayVideos.toggle()
+            config.autoplayVideos = binding.settingsAutoplayVideos.isChecked
         }
     }
 
     private fun setupRememberLastVideo() {
-        settings_remember_last_video_position.isChecked = config.rememberLastVideoPosition
-        settings_remember_last_video_position_holder.setOnClickListener {
-            settings_remember_last_video_position.toggle()
-            config.rememberLastVideoPosition = settings_remember_last_video_position.isChecked
+        binding.settingsRememberLastVideoPosition.isChecked = config.rememberLastVideoPosition
+        binding.settingsRememberLastVideoPositionHolder.setOnClickListener {
+            binding.settingsRememberLastVideoPosition.toggle()
+            config.rememberLastVideoPosition = binding.settingsRememberLastVideoPosition.isChecked
         }
     }
 
     private fun setupLoopVideos() {
-        settings_loop_videos.isChecked = config.loopVideos
-        settings_loop_videos_holder.setOnClickListener {
-            settings_loop_videos.toggle()
-            config.loopVideos = settings_loop_videos.isChecked
+        binding.settingsLoopVideos.isChecked = config.loopVideos
+        binding.settingsLoopVideosHolder.setOnClickListener {
+            binding.settingsLoopVideos.toggle()
+            config.loopVideos = binding.settingsLoopVideos.isChecked
         }
     }
 
     private fun setupOpenVideosOnSeparateScreen() {
-        settings_open_videos_on_separate_screen.isChecked = config.openVideosOnSeparateScreen
-        settings_open_videos_on_separate_screen_holder.setOnClickListener {
-            settings_open_videos_on_separate_screen.toggle()
-            config.openVideosOnSeparateScreen = settings_open_videos_on_separate_screen.isChecked
-        }
-    }
-
-    private fun setupAnimateGifs() {
-        settings_animate_gifs.isChecked = config.animateGifs
-        settings_animate_gifs_holder.setOnClickListener {
-            settings_animate_gifs.toggle()
-            config.animateGifs = settings_animate_gifs.isChecked
+        binding.settingsOpenVideosOnSeparateScreen.isChecked = config.openVideosOnSeparateScreen
+        binding.settingsOpenVideosOnSeparateScreenHolder.setOnClickListener {
+            binding.settingsOpenVideosOnSeparateScreen.toggle()
+            config.openVideosOnSeparateScreen = binding.settingsOpenVideosOnSeparateScreen.isChecked
         }
     }
 
     private fun setupMaxBrightness() {
-        settings_max_brightness.isChecked = config.maxBrightness
-        settings_max_brightness_holder.setOnClickListener {
-            settings_max_brightness.toggle()
-            config.maxBrightness = settings_max_brightness.isChecked
+        binding.settingsMaxBrightness.isChecked = config.maxBrightness
+        binding.settingsMaxBrightnessHolder.setOnClickListener {
+            binding.settingsMaxBrightness.toggle()
+            config.maxBrightness = binding.settingsMaxBrightness.isChecked
         }
     }
 
     private fun setupCropThumbnails() {
-        settings_crop_thumbnails.isChecked = config.cropThumbnails
-        settings_crop_thumbnails_holder.setOnClickListener {
-            settings_crop_thumbnails.toggle()
-            config.cropThumbnails = settings_crop_thumbnails.isChecked
+        binding.settingsCropThumbnails.isChecked = config.cropThumbnails
+        binding.settingsCropThumbnailsHolder.setOnClickListener {
+            binding.settingsCropThumbnails.toggle()
+            config.cropThumbnails = binding.settingsCropThumbnails.isChecked
         }
     }
 
-    private fun setupThumbnailVideoDuration() {
-        settings_show_thumbnail_video_duration.isChecked = config.showThumbnailVideoDuration
-        settings_show_thumbnail_video_duration_holder.setOnClickListener {
-            settings_show_thumbnail_video_duration.toggle()
-            config.showThumbnailVideoDuration = settings_show_thumbnail_video_duration.isChecked
-        }
-    }
-
-    private fun setupThumbnailFileTypes() {
-        settings_show_thumbnail_file_types.isChecked = config.showThumbnailFileTypes
-        settings_show_thumbnail_file_types_holder.setOnClickListener {
-            settings_show_thumbnail_file_types.toggle()
-            config.showThumbnailFileTypes = settings_show_thumbnail_file_types.isChecked
+    private fun setupAnimateGifs() {
+        binding.settingsAnimateGifs.isChecked = config.animateGifs
+        binding.settingsAnimateGifsHolder.setOnClickListener {
+            binding.settingsAnimateGifs.toggle()
+            config.animateGifs = binding.settingsAnimateGifs.isChecked
         }
     }
 
     private fun setupDarkBackground() {
-        settings_black_background.isChecked = config.blackBackground
-        settings_black_background_holder.setOnClickListener {
-            settings_black_background.toggle()
-            config.blackBackground = settings_black_background.isChecked
+        binding.settingsBlackBackground.isChecked = config.blackBackground
+        binding.settingsBlackBackgroundHolder.setOnClickListener {
+            binding.settingsBlackBackground.toggle()
+            config.blackBackground = binding.settingsBlackBackground.isChecked
         }
     }
 
     private fun setupScrollHorizontally() {
-        settings_scroll_horizontally.isChecked = config.scrollHorizontally
-        settings_scroll_horizontally_holder.setOnClickListener {
-            settings_scroll_horizontally.toggle()
-            config.scrollHorizontally = settings_scroll_horizontally.isChecked
+        binding.settingsScrollHorizontally.isChecked = config.scrollHorizontally
+        binding.settingsScrollHorizontallyHolder.setOnClickListener {
+            binding.settingsScrollHorizontally.toggle()
+            config.scrollHorizontally = binding.settingsScrollHorizontally.isChecked
 
             if (config.scrollHorizontally) {
                 config.enablePullToRefresh = false
-                settings_enable_pull_to_refresh.isChecked = false
+                binding.settingsEnablePullToRefresh.isChecked = false
             }
         }
     }
 
     private fun setupHideSystemUI() {
-        settings_hide_system_ui.isChecked = config.hideSystemUI
-        settings_hide_system_ui_holder.setOnClickListener {
-            settings_hide_system_ui.toggle()
-            config.hideSystemUI = settings_hide_system_ui.isChecked
+        binding.settingsHideSystemUi.isChecked = config.hideSystemUI
+        binding.settingsHideSystemUiHolder.setOnClickListener {
+            binding.settingsHideSystemUi.toggle()
+            config.hideSystemUI = binding.settingsHideSystemUi.isChecked
         }
     }
 
     private fun setupHiddenItemPasswordProtection() {
-        settings_hidden_item_password_protection.isChecked = config.isHiddenPasswordProtectionOn
-        settings_hidden_item_password_protection_holder.setOnClickListener {
+        binding.settingsHiddenItemPasswordProtectionHolder.beGoneIf(isRPlus() && !isExternalStorageManager())
+        binding.settingsHiddenItemPasswordProtection.isChecked = config.isHiddenPasswordProtectionOn
+        binding.settingsHiddenItemPasswordProtectionHolder.setOnClickListener {
             val tabToShow = if (config.isHiddenPasswordProtectionOn) config.hiddenProtectionType else SHOW_ALL_TABS
             SecurityDialog(this, config.hiddenPasswordHash, tabToShow) { hash, type, success ->
                 if (success) {
                     val hasPasswordProtection = config.isHiddenPasswordProtectionOn
-                    settings_hidden_item_password_protection.isChecked = !hasPasswordProtection
+                    binding.settingsHiddenItemPasswordProtection.isChecked = !hasPasswordProtection
                     config.isHiddenPasswordProtectionOn = !hasPasswordProtection
                     config.hiddenPasswordHash = if (hasPasswordProtection) "" else hash
                     config.hiddenProtectionType = type
 
                     if (config.isHiddenPasswordProtectionOn) {
                         val confirmationTextId = if (config.hiddenProtectionType == PROTECTION_FINGERPRINT)
-                            R.string.fingerprint_setup_successfully else R.string.protection_setup_successfully
-                        ConfirmationDialog(this, "", confirmationTextId, R.string.ok, 0) { }
+                            com.simplemobiletools.commons.R.string.fingerprint_setup_successfully else com.simplemobiletools.commons.R.string.protection_setup_successfully
+                        ConfirmationDialog(this, "", confirmationTextId, com.simplemobiletools.commons.R.string.ok, 0) { }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun setupExcludedItemPasswordProtection() {
+        binding.settingsExcludedItemPasswordProtectionHolder.beGoneIf(binding.settingsHiddenItemPasswordProtectionHolder.isVisible())
+        binding.settingsExcludedItemPasswordProtection.isChecked = config.isExcludedPasswordProtectionOn
+        binding.settingsExcludedItemPasswordProtectionHolder.setOnClickListener {
+            val tabToShow = if (config.isExcludedPasswordProtectionOn) config.excludedProtectionType else SHOW_ALL_TABS
+            SecurityDialog(this, config.excludedPasswordHash, tabToShow) { hash, type, success ->
+                if (success) {
+                    val hasPasswordProtection = config.isExcludedPasswordProtectionOn
+                    binding.settingsExcludedItemPasswordProtection.isChecked = !hasPasswordProtection
+                    config.isExcludedPasswordProtectionOn = !hasPasswordProtection
+                    config.excludedPasswordHash = if (hasPasswordProtection) "" else hash
+                    config.excludedProtectionType = type
+
+                    if (config.isExcludedPasswordProtectionOn) {
+                        val confirmationTextId = if (config.excludedProtectionType == PROTECTION_FINGERPRINT)
+                            com.simplemobiletools.commons.R.string.fingerprint_setup_successfully else com.simplemobiletools.commons.R.string.protection_setup_successfully
+                        ConfirmationDialog(this, "", confirmationTextId, com.simplemobiletools.commons.R.string.ok, 0) { }
                     }
                 }
             }
@@ -320,21 +395,21 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupAppPasswordProtection() {
-        settings_app_password_protection.isChecked = config.isAppPasswordProtectionOn
-        settings_app_password_protection_holder.setOnClickListener {
+        binding.settingsAppPasswordProtection.isChecked = config.isAppPasswordProtectionOn
+        binding.settingsAppPasswordProtectionHolder.setOnClickListener {
             val tabToShow = if (config.isAppPasswordProtectionOn) config.appProtectionType else SHOW_ALL_TABS
             SecurityDialog(this, config.appPasswordHash, tabToShow) { hash, type, success ->
                 if (success) {
                     val hasPasswordProtection = config.isAppPasswordProtectionOn
-                    settings_app_password_protection.isChecked = !hasPasswordProtection
+                    binding.settingsAppPasswordProtection.isChecked = !hasPasswordProtection
                     config.isAppPasswordProtectionOn = !hasPasswordProtection
                     config.appPasswordHash = if (hasPasswordProtection) "" else hash
                     config.appProtectionType = type
 
                     if (config.isAppPasswordProtectionOn) {
                         val confirmationTextId = if (config.appProtectionType == PROTECTION_FINGERPRINT)
-                            R.string.fingerprint_setup_successfully else R.string.protection_setup_successfully
-                        ConfirmationDialog(this, "", confirmationTextId, R.string.ok, 0) { }
+                            com.simplemobiletools.commons.R.string.fingerprint_setup_successfully else com.simplemobiletools.commons.R.string.protection_setup_successfully
+                        ConfirmationDialog(this, "", confirmationTextId, com.simplemobiletools.commons.R.string.ok, 0) { }
                     }
                 }
             }
@@ -342,21 +417,21 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupFileDeletionPasswordProtection() {
-        settings_file_deletion_password_protection.isChecked = config.isDeletePasswordProtectionOn
-        settings_file_deletion_password_protection_holder.setOnClickListener {
+        binding.settingsFileDeletionPasswordProtection.isChecked = config.isDeletePasswordProtectionOn
+        binding.settingsFileDeletionPasswordProtectionHolder.setOnClickListener {
             val tabToShow = if (config.isDeletePasswordProtectionOn) config.deleteProtectionType else SHOW_ALL_TABS
             SecurityDialog(this, config.deletePasswordHash, tabToShow) { hash, type, success ->
                 if (success) {
                     val hasPasswordProtection = config.isDeletePasswordProtectionOn
-                    settings_file_deletion_password_protection.isChecked = !hasPasswordProtection
+                    binding.settingsFileDeletionPasswordProtection.isChecked = !hasPasswordProtection
                     config.isDeletePasswordProtectionOn = !hasPasswordProtection
                     config.deletePasswordHash = if (hasPasswordProtection) "" else hash
                     config.deleteProtectionType = type
 
                     if (config.isDeletePasswordProtectionOn) {
                         val confirmationTextId = if (config.deleteProtectionType == PROTECTION_FINGERPRINT)
-                            R.string.fingerprint_setup_successfully else R.string.protection_setup_successfully
-                        ConfirmationDialog(this, "", confirmationTextId, R.string.ok, 0) { }
+                            com.simplemobiletools.commons.R.string.fingerprint_setup_successfully else com.simplemobiletools.commons.R.string.protection_setup_successfully
+                        ConfirmationDialog(this, "", confirmationTextId, com.simplemobiletools.commons.R.string.ok, 0) { }
                     }
                 }
             }
@@ -364,200 +439,214 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupDeleteEmptyFolders() {
-        settings_delete_empty_folders.isChecked = config.deleteEmptyFolders
-        settings_delete_empty_folders_holder.setOnClickListener {
-            settings_delete_empty_folders.toggle()
-            config.deleteEmptyFolders = settings_delete_empty_folders.isChecked
+        binding.settingsDeleteEmptyFolders.isChecked = config.deleteEmptyFolders
+        binding.settingsDeleteEmptyFoldersHolder.setOnClickListener {
+            binding.settingsDeleteEmptyFolders.toggle()
+            config.deleteEmptyFolders = binding.settingsDeleteEmptyFolders.isChecked
         }
     }
 
     private fun setupAllowPhotoGestures() {
-        settings_allow_photo_gestures.isChecked = config.allowPhotoGestures
-        settings_allow_photo_gestures_holder.setOnClickListener {
-            settings_allow_photo_gestures.toggle()
-            config.allowPhotoGestures = settings_allow_photo_gestures.isChecked
+        binding.settingsAllowPhotoGestures.isChecked = config.allowPhotoGestures
+        binding.settingsAllowPhotoGesturesHolder.setOnClickListener {
+            binding.settingsAllowPhotoGestures.toggle()
+            config.allowPhotoGestures = binding.settingsAllowPhotoGestures.isChecked
         }
     }
 
     private fun setupAllowVideoGestures() {
-        settings_allow_video_gestures.isChecked = config.allowVideoGestures
-        settings_allow_video_gestures_holder.setOnClickListener {
-            settings_allow_video_gestures.toggle()
-            config.allowVideoGestures = settings_allow_video_gestures.isChecked
+        binding.settingsAllowVideoGestures.isChecked = config.allowVideoGestures
+        binding.settingsAllowVideoGesturesHolder.setOnClickListener {
+            binding.settingsAllowVideoGestures.toggle()
+            config.allowVideoGestures = binding.settingsAllowVideoGestures.isChecked
         }
     }
 
     private fun setupAllowDownGesture() {
-        settings_allow_down_gesture.isChecked = config.allowDownGesture
-        settings_allow_down_gesture_holder.setOnClickListener {
-            settings_allow_down_gesture.toggle()
-            config.allowDownGesture = settings_allow_down_gesture.isChecked
+        binding.settingsAllowDownGesture.isChecked = config.allowDownGesture
+        binding.settingsAllowDownGestureHolder.setOnClickListener {
+            binding.settingsAllowDownGesture.toggle()
+            config.allowDownGesture = binding.settingsAllowDownGesture.isChecked
         }
     }
 
     private fun setupAllowRotatingWithGestures() {
-        settings_allow_rotating_with_gestures.isChecked = config.allowRotatingWithGestures
-        settings_allow_rotating_with_gestures_holder.setOnClickListener {
-            settings_allow_rotating_with_gestures.toggle()
-            config.allowRotatingWithGestures = settings_allow_rotating_with_gestures.isChecked
+        binding.settingsAllowRotatingWithGestures.isChecked = config.allowRotatingWithGestures
+        binding.settingsAllowRotatingWithGesturesHolder.setOnClickListener {
+            binding.settingsAllowRotatingWithGestures.toggle()
+            config.allowRotatingWithGestures = binding.settingsAllowRotatingWithGestures.isChecked
         }
     }
 
     private fun setupShowNotch() {
-        settings_show_notch_holder.beVisibleIf(isPiePlus())
-        settings_show_notch.isChecked = config.showNotch
-        settings_show_notch_holder.setOnClickListener {
-            settings_show_notch.toggle()
-            config.showNotch = settings_show_notch.isChecked
+        binding.settingsShowNotchHolder.beVisibleIf(isPiePlus())
+        binding.settingsShowNotch.isChecked = config.showNotch
+        binding.settingsShowNotchHolder.setOnClickListener {
+            binding.settingsShowNotch.toggle()
+            config.showNotch = binding.settingsShowNotch.isChecked
         }
     }
 
-    private fun setupShowMediaCount() {
-        settings_show_media_count.isChecked = config.showMediaCount
-        settings_show_media_count_holder.setOnClickListener {
-            settings_show_media_count.toggle()
-            config.showMediaCount = settings_show_media_count.isChecked
+    private fun setupFileThumbnailStyle() {
+        binding.settingsFileThumbnailStyleHolder.setOnClickListener {
+            ChangeFileThumbnailStyleDialog(this)
         }
     }
+
+    private fun setupFolderThumbnailStyle() {
+        binding.settingsFolderThumbnailStyle.text = getFolderStyleText()
+        binding.settingsFolderThumbnailStyleHolder.setOnClickListener {
+            ChangeFolderThumbnailStyleDialog(this) {
+                binding.settingsFolderThumbnailStyle.text = getFolderStyleText()
+            }
+        }
+    }
+
+    private fun getFolderStyleText() = getString(
+        when (config.folderStyle) {
+            FOLDER_STYLE_SQUARE -> R.string.square
+            else -> R.string.rounded_corners
+        }
+    )
 
     private fun setupKeepLastModified() {
-        settings_keep_last_modified.isChecked = config.keepLastModified
-        settings_keep_last_modified_holder.setOnClickListener {
-            settings_keep_last_modified.toggle()
-            config.keepLastModified = settings_keep_last_modified.isChecked
-        }
-    }
-
-    private fun setupShowInfoBubble() {
-        settings_show_info_bubble.isChecked = config.showInfoBubble
-        settings_show_info_bubble_holder.setOnClickListener {
-            settings_show_info_bubble.toggle()
-            config.showInfoBubble = settings_show_info_bubble.isChecked
+        binding.settingsKeepLastModified.isChecked = config.keepLastModified
+        binding.settingsKeepLastModifiedHolder.setOnClickListener {
+            handleMediaManagementPrompt {
+                binding.settingsKeepLastModified.toggle()
+                config.keepLastModified = binding.settingsKeepLastModified.isChecked
+            }
         }
     }
 
     private fun setupEnablePullToRefresh() {
-        settings_enable_pull_to_refresh.isChecked = config.enablePullToRefresh
-        settings_enable_pull_to_refresh_holder.setOnClickListener {
-            settings_enable_pull_to_refresh.toggle()
-            config.enablePullToRefresh = settings_enable_pull_to_refresh.isChecked
+        binding.settingsEnablePullToRefresh.isChecked = config.enablePullToRefresh
+        binding.settingsEnablePullToRefreshHolder.setOnClickListener {
+            binding.settingsEnablePullToRefresh.toggle()
+            config.enablePullToRefresh = binding.settingsEnablePullToRefresh.isChecked
         }
     }
 
     private fun setupAllowZoomingImages() {
-        settings_allow_zooming_images.isChecked = config.allowZoomingImages
+        binding.settingsAllowZoomingImages.isChecked = config.allowZoomingImages
         updateDeepZoomToggleButtons()
-        settings_allow_zooming_images_holder.setOnClickListener {
-            settings_allow_zooming_images.toggle()
-            config.allowZoomingImages = settings_allow_zooming_images.isChecked
+        binding.settingsAllowZoomingImagesHolder.setOnClickListener {
+            binding.settingsAllowZoomingImages.toggle()
+            config.allowZoomingImages = binding.settingsAllowZoomingImages.isChecked
             updateDeepZoomToggleButtons()
         }
     }
 
     private fun updateDeepZoomToggleButtons() {
-        settings_allow_rotating_with_gestures_holder.beVisibleIf(config.allowZoomingImages)
-        settings_show_highest_quality_holder.beVisibleIf(config.allowZoomingImages)
-        settings_allow_one_to_one_zoom_holder.beVisibleIf(config.allowZoomingImages)
+        binding.settingsAllowRotatingWithGesturesHolder.beVisibleIf(config.allowZoomingImages)
+        binding.settingsShowHighestQualityHolder.beVisibleIf(config.allowZoomingImages)
+        binding.settingsAllowOneToOneZoomHolder.beVisibleIf(config.allowZoomingImages)
     }
 
     private fun setupShowHighestQuality() {
-        settings_show_highest_quality.isChecked = config.showHighestQuality
-        settings_show_highest_quality_holder.setOnClickListener {
-            settings_show_highest_quality.toggle()
-            config.showHighestQuality = settings_show_highest_quality.isChecked
+        binding.settingsShowHighestQuality.isChecked = config.showHighestQuality
+        binding.settingsShowHighestQualityHolder.setOnClickListener {
+            binding.settingsShowHighestQuality.toggle()
+            config.showHighestQuality = binding.settingsShowHighestQuality.isChecked
         }
     }
 
     private fun setupAllowOneToOneZoom() {
-        settings_allow_one_to_one_zoom.isChecked = config.allowOneToOneZoom
-        settings_allow_one_to_one_zoom_holder.setOnClickListener {
-            settings_allow_one_to_one_zoom.toggle()
-            config.allowOneToOneZoom = settings_allow_one_to_one_zoom.isChecked
+        binding.settingsAllowOneToOneZoom.isChecked = config.allowOneToOneZoom
+        binding.settingsAllowOneToOneZoomHolder.setOnClickListener {
+            binding.settingsAllowOneToOneZoom.toggle()
+            config.allowOneToOneZoom = binding.settingsAllowOneToOneZoom.isChecked
         }
     }
 
     private fun setupAllowInstantChange() {
-        settings_allow_instant_change.isChecked = config.allowInstantChange
-        settings_allow_instant_change_holder.setOnClickListener {
-            settings_allow_instant_change.toggle()
-            config.allowInstantChange = settings_allow_instant_change.isChecked
+        binding.settingsAllowInstantChange.isChecked = config.allowInstantChange
+        binding.settingsAllowInstantChangeHolder.setOnClickListener {
+            binding.settingsAllowInstantChange.toggle()
+            config.allowInstantChange = binding.settingsAllowInstantChange.isChecked
         }
     }
 
     private fun setupShowExtendedDetails() {
-        settings_show_extended_details.isChecked = config.showExtendedDetails
-        settings_show_extended_details_holder.setOnClickListener {
-            settings_show_extended_details.toggle()
-            config.showExtendedDetails = settings_show_extended_details.isChecked
-            settings_manage_extended_details_holder.beVisibleIf(config.showExtendedDetails)
-            settings_hide_extended_details_holder.beVisibleIf(config.showExtendedDetails)
+        binding.settingsShowExtendedDetails.isChecked = config.showExtendedDetails
+        updateExtendedDetailsButtons()
+        binding.settingsShowExtendedDetailsHolder.setOnClickListener {
+            binding.settingsShowExtendedDetails.toggle()
+            config.showExtendedDetails = binding.settingsShowExtendedDetails.isChecked
+            updateExtendedDetailsButtons()
         }
     }
 
     private fun setupHideExtendedDetails() {
-        settings_hide_extended_details_holder.beVisibleIf(config.showExtendedDetails)
-        settings_hide_extended_details.isChecked = config.hideExtendedDetails
-        settings_hide_extended_details_holder.setOnClickListener {
-            settings_hide_extended_details.toggle()
-            config.hideExtendedDetails = settings_hide_extended_details.isChecked
+        binding.settingsHideExtendedDetails.isChecked = config.hideExtendedDetails
+        binding.settingsHideExtendedDetailsHolder.setOnClickListener {
+            binding.settingsHideExtendedDetails.toggle()
+            config.hideExtendedDetails = binding.settingsHideExtendedDetails.isChecked
         }
     }
 
     private fun setupManageExtendedDetails() {
-        settings_manage_extended_details_holder.beVisibleIf(config.showExtendedDetails)
-        settings_manage_extended_details_holder.setOnClickListener {
+        binding.settingsManageExtendedDetailsHolder.setOnClickListener {
             ManageExtendedDetailsDialog(this) {
                 if (config.extendedDetails == 0) {
-                    settings_show_extended_details_holder.callOnClick()
+                    binding.settingsShowExtendedDetailsHolder.callOnClick()
                 }
             }
         }
     }
 
+    private fun updateExtendedDetailsButtons() {
+        binding.settingsManageExtendedDetailsHolder.beVisibleIf(config.showExtendedDetails)
+        binding.settingsHideExtendedDetailsHolder.beVisibleIf(config.showExtendedDetails)
+    }
+
     private fun setupSkipDeleteConfirmation() {
-        settings_skip_delete_confirmation.isChecked = config.skipDeleteConfirmation
-        settings_skip_delete_confirmation_holder.setOnClickListener {
-            settings_skip_delete_confirmation.toggle()
-            config.skipDeleteConfirmation = settings_skip_delete_confirmation.isChecked
+        binding.settingsSkipDeleteConfirmation.isChecked = config.skipDeleteConfirmation
+        binding.settingsSkipDeleteConfirmationHolder.setOnClickListener {
+            binding.settingsSkipDeleteConfirmation.toggle()
+            config.skipDeleteConfirmation = binding.settingsSkipDeleteConfirmation.isChecked
         }
     }
 
     private fun setupScreenRotation() {
-        settings_screen_rotation.text = getScreenRotationText()
-        settings_screen_rotation_holder.setOnClickListener {
+        binding.settingsScreenRotation.text = getScreenRotationText()
+        binding.settingsScreenRotationHolder.setOnClickListener {
             val items = arrayListOf(
-                    RadioItem(ROTATE_BY_SYSTEM_SETTING, getString(R.string.screen_rotation_system_setting)),
-                    RadioItem(ROTATE_BY_DEVICE_ROTATION, getString(R.string.screen_rotation_device_rotation)),
-                    RadioItem(ROTATE_BY_ASPECT_RATIO, getString(R.string.screen_rotation_aspect_ratio)))
+                RadioItem(ROTATE_BY_SYSTEM_SETTING, getString(R.string.screen_rotation_system_setting)),
+                RadioItem(ROTATE_BY_DEVICE_ROTATION, getString(R.string.screen_rotation_device_rotation)),
+                RadioItem(ROTATE_BY_ASPECT_RATIO, getString(R.string.screen_rotation_aspect_ratio))
+            )
 
             RadioGroupDialog(this@SettingsActivity, items, config.screenRotation) {
                 config.screenRotation = it as Int
-                settings_screen_rotation.text = getScreenRotationText()
+                binding.settingsScreenRotation.text = getScreenRotationText()
             }
         }
     }
 
-    private fun getScreenRotationText() = getString(when (config.screenRotation) {
-        ROTATE_BY_SYSTEM_SETTING -> R.string.screen_rotation_system_setting
-        ROTATE_BY_DEVICE_ROTATION -> R.string.screen_rotation_device_rotation
-        else -> R.string.screen_rotation_aspect_ratio
-    })
+    private fun getScreenRotationText() = getString(
+        when (config.screenRotation) {
+            ROTATE_BY_SYSTEM_SETTING -> R.string.screen_rotation_system_setting
+            ROTATE_BY_DEVICE_ROTATION -> R.string.screen_rotation_device_rotation
+            else -> R.string.screen_rotation_aspect_ratio
+        }
+    )
 
     private fun setupBottomActions() {
-        settings_bottom_actions.isChecked = config.bottomActions
-        settings_bottom_actions_holder.setOnClickListener {
-            settings_bottom_actions.toggle()
-            config.bottomActions = settings_bottom_actions.isChecked
-            settings_manage_bottom_actions_holder.beVisibleIf(config.bottomActions)
+        binding.settingsBottomActionsCheckbox.isChecked = config.bottomActions
+        binding.settingsManageBottomActionsHolder.beVisibleIf(config.bottomActions)
+        binding.settingsBottomActionsCheckboxHolder.setOnClickListener {
+            binding.settingsBottomActionsCheckbox.toggle()
+            config.bottomActions = binding.settingsBottomActionsCheckbox.isChecked
+            binding.settingsManageBottomActionsHolder.beVisibleIf(config.bottomActions)
         }
     }
 
     private fun setupManageBottomActions() {
-        settings_manage_bottom_actions_holder.beVisibleIf(config.bottomActions)
-        settings_manage_bottom_actions_holder.setOnClickListener {
+        binding.settingsManageBottomActionsHolder.setOnClickListener {
             ManageBottomActionsDialog(this) {
                 if (config.visibleBottomActions == 0) {
-                    settings_bottom_actions_holder.callOnClick()
+                    binding.settingsBottomActionsCheckboxHolder.callOnClick()
                     config.bottomActions = false
                     config.visibleBottomActions = DEFAULT_BOTTOM_ACTIONS
                 }
@@ -566,70 +655,209 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupUseRecycleBin() {
-        settings_empty_recycle_bin_holder.beVisibleIf(config.useRecycleBin)
-        settings_show_recycle_bin_holder.beVisibleIf(config.useRecycleBin)
-        settings_show_recycle_bin_last_holder.beVisibleIf(config.useRecycleBin && config.showRecycleBinAtFolders)
-        settings_use_recycle_bin.isChecked = config.useRecycleBin
-        settings_use_recycle_bin_holder.setOnClickListener {
-            settings_use_recycle_bin.toggle()
-            config.useRecycleBin = settings_use_recycle_bin.isChecked
-            settings_empty_recycle_bin_holder.beVisibleIf(config.useRecycleBin)
-            settings_show_recycle_bin_holder.beVisibleIf(config.useRecycleBin)
-            settings_show_recycle_bin_last_holder.beVisibleIf(config.useRecycleBin && config.showRecycleBinAtFolders)
+        updateRecycleBinButtons()
+        binding.settingsUseRecycleBin.isChecked = config.useRecycleBin
+        binding.settingsUseRecycleBinHolder.setOnClickListener {
+            binding.settingsUseRecycleBin.toggle()
+            config.useRecycleBin = binding.settingsUseRecycleBin.isChecked
+            updateRecycleBinButtons()
         }
     }
 
     private fun setupShowRecycleBin() {
-        settings_show_recycle_bin.isChecked = config.showRecycleBinAtFolders
-        settings_show_recycle_bin_holder.setOnClickListener {
-            settings_show_recycle_bin.toggle()
-            config.showRecycleBinAtFolders = settings_show_recycle_bin.isChecked
-            settings_show_recycle_bin_last_holder.beVisibleIf(config.useRecycleBin && config.showRecycleBinAtFolders)
+        binding.settingsShowRecycleBin.isChecked = config.showRecycleBinAtFolders
+        binding.settingsShowRecycleBinHolder.setOnClickListener {
+            binding.settingsShowRecycleBin.toggle()
+            config.showRecycleBinAtFolders = binding.settingsShowRecycleBin.isChecked
+            updateRecycleBinButtons()
         }
     }
 
     private fun setupShowRecycleBinLast() {
-        settings_show_recycle_bin_last.isChecked = config.showRecycleBinLast
-        settings_show_recycle_bin_last_holder.setOnClickListener {
-            settings_show_recycle_bin_last.toggle()
-            config.showRecycleBinLast = settings_show_recycle_bin_last.isChecked
+        binding.settingsShowRecycleBinLast.isChecked = config.showRecycleBinLast
+        binding.settingsShowRecycleBinLastHolder.setOnClickListener {
+            binding.settingsShowRecycleBinLast.toggle()
+            config.showRecycleBinLast = binding.settingsShowRecycleBinLast.isChecked
             if (config.showRecycleBinLast) {
                 config.removePinnedFolders(setOf(RECYCLE_BIN))
             }
         }
     }
 
+    private fun updateRecycleBinButtons() {
+        binding.settingsShowRecycleBinLastHolder.beVisibleIf(config.useRecycleBin && config.showRecycleBinAtFolders)
+        binding.settingsEmptyRecycleBinHolder.beVisibleIf(config.useRecycleBin)
+        binding.settingsShowRecycleBinHolder.beVisibleIf(config.useRecycleBin)
+    }
+
     private fun setupEmptyRecycleBin() {
         ensureBackgroundThread {
             try {
-                mRecycleBinContentSize = mediaDB.getDeletedMedia().sumByLong { it.size }
+                mRecycleBinContentSize = mediaDB.getDeletedMedia().sumByLong { medium ->
+                    val size = medium.size
+                    if (size == 0L) {
+                        val path = medium.path.removePrefix(RECYCLE_BIN).prependIndent(recycleBinPath)
+                        File(path).length()
+                    } else {
+                        size
+                    }
+                }
             } catch (ignored: Exception) {
             }
+
             runOnUiThread {
-                settings_empty_recycle_bin_size.text = mRecycleBinContentSize.formatSize()
+                binding.settingsEmptyRecycleBinSize.text = mRecycleBinContentSize.formatSize()
             }
         }
 
-        settings_empty_recycle_bin_holder.setOnClickListener {
+        binding.settingsEmptyRecycleBinHolder.setOnClickListener {
             if (mRecycleBinContentSize == 0L) {
-                toast(R.string.recycle_bin_empty)
+                toast(com.simplemobiletools.commons.R.string.recycle_bin_empty)
             } else {
                 showRecycleBinEmptyingDialog {
                     emptyTheRecycleBin()
                     mRecycleBinContentSize = 0L
-                    settings_empty_recycle_bin_size.text = 0L.formatSize()
+                    binding.settingsEmptyRecycleBinSize.text = 0L.formatSize()
                 }
             }
         }
     }
 
+    private fun setupClearCache() {
+        ensureBackgroundThread {
+            val size = cacheDir.getProperSize(true).formatSize()
+            runOnUiThread {
+                binding.settingsClearCacheSize.text = size
+            }
+        }
+
+        binding.settingsClearCacheHolder.setOnClickListener {
+            ensureBackgroundThread {
+                cacheDir.deleteRecursively()
+                runOnUiThread {
+                    binding.settingsClearCacheSize.text = cacheDir.getProperSize(true).formatSize()
+                }
+            }
+        }
+    }
+
+    private fun setupExportFavorites() {
+        binding.settingsExportFavoritesHolder.setOnClickListener {
+            if (isQPlus()) {
+                ExportFavoritesDialog(this, getExportFavoritesFilename(), true) { path, filename ->
+                    Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TITLE, filename)
+                        addCategory(Intent.CATEGORY_OPENABLE)
+
+                        try {
+                            startActivityForResult(this, SELECT_EXPORT_FAVORITES_FILE_INTENT)
+                        } catch (e: ActivityNotFoundException) {
+                            toast(com.simplemobiletools.commons.R.string.system_service_disabled, Toast.LENGTH_LONG)
+                        } catch (e: Exception) {
+                            showErrorToast(e)
+                        }
+                    }
+                }
+            } else {
+                handlePermission(PERMISSION_WRITE_STORAGE) {
+                    if (it) {
+                        ExportFavoritesDialog(this, getExportFavoritesFilename(), false) { path, filename ->
+                            val file = File(path)
+                            getFileOutputStream(file.toFileDirItem(this), true) {
+                                exportFavoritesTo(it)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun exportFavoritesTo(outputStream: OutputStream?) {
+        if (outputStream == null) {
+            toast(com.simplemobiletools.commons.R.string.unknown_error_occurred)
+            return
+        }
+
+        ensureBackgroundThread {
+            val favoritePaths = favoritesDB.getValidFavoritePaths()
+            if (favoritePaths.isNotEmpty()) {
+                outputStream.bufferedWriter().use { out ->
+                    favoritePaths.forEach { path ->
+                        out.writeLn(path)
+                    }
+                }
+
+                toast(com.simplemobiletools.commons.R.string.exporting_successful)
+            } else {
+                toast(com.simplemobiletools.commons.R.string.no_items_found)
+            }
+        }
+    }
+
+    private fun getExportFavoritesFilename(): String {
+        val appName = baseConfig.appId.removeSuffix(".debug").removeSuffix(".pro").removePrefix("com.simplemobiletools.")
+        return "$appName-favorites_${getCurrentFormattedDateTime()}"
+    }
+
+    private fun setupImportFavorites() {
+        binding.settingsImportFavoritesHolder.setOnClickListener {
+            if (isQPlus()) {
+                Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "text/plain"
+                    startActivityForResult(this, SELECT_IMPORT_FAVORITES_FILE_INTENT)
+                }
+            } else {
+                handlePermission(PERMISSION_READ_STORAGE) {
+                    if (it) {
+                        FilePickerDialog(this) {
+                            ensureBackgroundThread {
+                                importFavorites(File(it).inputStream())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun importFavorites(inputStream: InputStream?) {
+        if (inputStream == null) {
+            toast(com.simplemobiletools.commons.R.string.unknown_error_occurred)
+            return
+        }
+
+        ensureBackgroundThread {
+            var importedItems = 0
+            inputStream.bufferedReader().use {
+                while (true) {
+                    try {
+                        val line = it.readLine() ?: break
+                        if (getDoesFilePathExist(line)) {
+                            val favorite = getFavoriteFromPath(line)
+                            favoritesDB.insert(favorite)
+                            importedItems++
+                        }
+                    } catch (e: Exception) {
+                        showErrorToast(e)
+                    }
+                }
+            }
+
+            toast(if (importedItems > 0) com.simplemobiletools.commons.R.string.importing_successful else com.simplemobiletools.commons.R.string.no_entries_for_importing)
+        }
+    }
+
     private fun setupExportSettings() {
-        settings_export_holder.setOnClickListener {
+        binding.settingsExportHolder.setOnClickListener {
             val configItems = LinkedHashMap<String, Any>().apply {
                 put(IS_USING_SHARED_THEME, config.isUsingSharedTheme)
                 put(TEXT_COLOR, config.textColor)
                 put(BACKGROUND_COLOR, config.backgroundColor)
                 put(PRIMARY_COLOR, config.primaryColor)
+                put(ACCENT_COLOR, config.accentColor)
                 put(APP_ICON_COLOR, config.appIconColor)
                 put(USE_ENGLISH, config.useEnglish)
                 put(WAS_USE_ENGLISH_TOGGLED, config.wasUseEnglishToggled)
@@ -649,8 +877,8 @@ class SettingsActivity : SimpleActivity() {
                 put(ANIMATE_GIFS, config.animateGifs)
                 put(CROP_THUMBNAILS, config.cropThumbnails)
                 put(SHOW_THUMBNAIL_VIDEO_DURATION, config.showThumbnailVideoDuration)
-                put(SHOW_MEDIA_COUNT, config.showMediaCount)
-                put(SHOW_INFO_BUBBLE, config.showInfoBubble)
+                put(SHOW_THUMBNAIL_FILE_TYPES, config.showThumbnailFileTypes)
+                put(MARK_FAVORITE_ITEMS, config.markFavoriteItems)
                 put(SCROLL_HORIZONTALLY, config.scrollHorizontally)
                 put(ENABLE_PULL_TO_REFRESH, config.enablePullToRefresh)
                 put(MAX_BRIGHTNESS, config.maxBrightness)
@@ -704,6 +932,12 @@ class SettingsActivity : SimpleActivity() {
                 put(EDITOR_BRUSH_HARDNESS, config.editorBrushHardness)
                 put(EDITOR_BRUSH_SIZE, config.editorBrushSize)
                 put(ALBUM_COVERS, config.albumCovers)
+                put(FOLDER_THUMBNAIL_STYLE, config.folderStyle)
+                put(FOLDER_MEDIA_COUNT, config.showFolderMediaCount)
+                put(LIMIT_FOLDER_TITLE, config.limitFolderTitle)
+                put(THUMBNAIL_SPACING, config.thumbnailSpacing)
+                put(FILE_ROUNDED_CORNERS, config.fileRoundedCorners)
+                put(SEARCH_ALL_FILES_BY_DEFAULT, config.searchAllFilesByDefault)
             }
 
             exportSettings(configItems)
@@ -711,7 +945,7 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun setupImportSettings() {
-        settings_import_holder.setOnClickListener {
+        binding.settingsImportHolder.setOnClickListener {
             if (isQPlus()) {
                 Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
@@ -734,7 +968,7 @@ class SettingsActivity : SimpleActivity() {
 
     private fun parseFile(inputStream: InputStream?) {
         if (inputStream == null) {
-            toast(R.string.unknown_error_occurred)
+            toast(com.simplemobiletools.commons.R.string.unknown_error_occurred)
             return
         }
 
@@ -761,12 +995,14 @@ class SettingsActivity : SimpleActivity() {
                 TEXT_COLOR -> config.textColor = value.toInt()
                 BACKGROUND_COLOR -> config.backgroundColor = value.toInt()
                 PRIMARY_COLOR -> config.primaryColor = value.toInt()
+                ACCENT_COLOR -> config.accentColor = value.toInt()
                 APP_ICON_COLOR -> {
                     if (getAppIconColors().contains(value.toInt())) {
                         config.appIconColor = value.toInt()
                         checkAppIconColor()
                     }
                 }
+
                 USE_ENGLISH -> config.useEnglish = value.toBoolean()
                 WAS_USE_ENGLISH_TOGGLED -> config.wasUseEnglishToggled = value.toBoolean()
                 WIDGET_BG_COLOR -> config.widgetBgColor = value.toInt()
@@ -785,8 +1021,8 @@ class SettingsActivity : SimpleActivity() {
                 ANIMATE_GIFS -> config.animateGifs = value.toBoolean()
                 CROP_THUMBNAILS -> config.cropThumbnails = value.toBoolean()
                 SHOW_THUMBNAIL_VIDEO_DURATION -> config.showThumbnailVideoDuration = value.toBoolean()
-                SHOW_MEDIA_COUNT -> config.showMediaCount = value.toBoolean()
-                SHOW_INFO_BUBBLE -> config.showInfoBubble = value.toBoolean()
+                SHOW_THUMBNAIL_FILE_TYPES -> config.showThumbnailFileTypes = value.toBoolean()
+                MARK_FAVORITE_ITEMS -> config.markFavoriteItems = value.toBoolean()
                 SCROLL_HORIZONTALLY -> config.scrollHorizontally = value.toBoolean()
                 ENABLE_PULL_TO_REFRESH -> config.enablePullToRefresh = value.toBoolean()
                 MAX_BRIGHTNESS -> config.maxBrightness = value.toBoolean()
@@ -839,6 +1075,12 @@ class SettingsActivity : SimpleActivity() {
                 EDITOR_BRUSH_COLOR -> config.editorBrushColor = value.toInt()
                 EDITOR_BRUSH_HARDNESS -> config.editorBrushHardness = value.toString().toFloat()
                 EDITOR_BRUSH_SIZE -> config.editorBrushSize = value.toString().toFloat()
+                FOLDER_THUMBNAIL_STYLE -> config.folderStyle = value.toInt()
+                FOLDER_MEDIA_COUNT -> config.showFolderMediaCount = value.toInt()
+                LIMIT_FOLDER_TITLE -> config.limitFolderTitle = value.toBoolean()
+                THUMBNAIL_SPACING -> config.thumbnailSpacing = value.toInt()
+                FILE_ROUNDED_CORNERS -> config.fileRoundedCorners = value.toBoolean()
+                SEARCH_ALL_FILES_BY_DEFAULT -> config.searchAllFilesByDefault = value.toBoolean()
                 ALBUM_COVERS -> {
                     val existingCovers = config.parseAlbumCovers()
                     val existingCoverPaths = existingCovers.map { it.path }.toMutableList() as ArrayList<String>
@@ -854,7 +1096,7 @@ class SettingsActivity : SimpleActivity() {
             }
         }
 
-        toast(if (configValues.size > 0) R.string.settings_imported_successfully else R.string.no_entries_for_importing)
+        toast(if (configValues.size > 0) com.simplemobiletools.commons.R.string.settings_imported_successfully else com.simplemobiletools.commons.R.string.no_entries_for_importing)
         runOnUiThread {
             setupSettingItems()
         }

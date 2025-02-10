@@ -1,56 +1,76 @@
 package com.simplemobiletools.gallery.pro.dialogs
 
+import android.graphics.Color
 import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.dialogs.FilePickerDialog
 import com.simplemobiletools.commons.extensions.*
+import com.simplemobiletools.commons.helpers.VIEW_TYPE_GRID
 import com.simplemobiletools.commons.views.MyGridLayoutManager
+import com.simplemobiletools.commons.views.MySearchMenu
 import com.simplemobiletools.gallery.pro.R
 import com.simplemobiletools.gallery.pro.adapters.DirectoryAdapter
+import com.simplemobiletools.gallery.pro.databinding.DialogDirectoryPickerBinding
 import com.simplemobiletools.gallery.pro.extensions.*
-import com.simplemobiletools.gallery.pro.helpers.VIEW_TYPE_GRID
 import com.simplemobiletools.gallery.pro.models.Directory
-import kotlinx.android.synthetic.main.dialog_directory_picker.view.*
 
-class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: String, showOtherFolderButton: Boolean, val showFavoritesBin: Boolean,
-                          val callback: (path: String) -> Unit) {
-    private var dialog: AlertDialog
+class PickDirectoryDialog(
+    val activity: BaseSimpleActivity,
+    val sourcePath: String,
+    showOtherFolderButton: Boolean,
+    val showFavoritesBin: Boolean,
+    val isPickingCopyMoveDestination: Boolean,
+    val isPickingFolderForWidget: Boolean,
+    val callback: (path: String) -> Unit
+) {
+    private var dialog: AlertDialog? = null
     private var shownDirectories = ArrayList<Directory>()
     private var allDirectories = ArrayList<Directory>()
     private var openedSubfolders = arrayListOf("")
-    private var view = activity.layoutInflater.inflate(R.layout.dialog_directory_picker, null)
+    private var binding = DialogDirectoryPickerBinding.inflate(activity.layoutInflater)
     private var isGridViewType = activity.config.viewTypeFolders == VIEW_TYPE_GRID
     private var showHidden = activity.config.shouldShowHidden
     private var currentPathPrefix = ""
+    private val config = activity.config
+    private val searchView = binding.folderSearchView
+    private val searchEditText = searchView.binding.topToolbarSearch
+    private val searchViewAppBarLayout = searchView.binding.topAppBarLayout
 
     init {
-        (view.directories_grid.layoutManager as MyGridLayoutManager).apply {
+        (binding.directoriesGrid.layoutManager as MyGridLayoutManager).apply {
             orientation = if (activity.config.scrollHorizontally && isGridViewType) RecyclerView.HORIZONTAL else RecyclerView.VERTICAL
             spanCount = if (isGridViewType) activity.config.dirColumnCnt else 1
         }
 
-        val builder = AlertDialog.Builder(activity)
-                .setPositiveButton(R.string.ok, null)
-                .setNegativeButton(R.string.cancel, null)
-                .setOnKeyListener { dialogInterface, i, keyEvent ->
-                    if (keyEvent.action == KeyEvent.ACTION_UP && i == KeyEvent.KEYCODE_BACK) {
-                        backPressed()
-                    }
-                    true
+        binding.directoriesFastscroller.updateColors(activity.getProperPrimaryColor())
+
+        configureSearchView()
+
+        val builder = activity.getAlertDialogBuilder()
+            .setPositiveButton(com.simplemobiletools.commons.R.string.ok, null)
+            .setNegativeButton(com.simplemobiletools.commons.R.string.cancel, null)
+            .setOnKeyListener { dialogInterface, i, keyEvent ->
+                if (keyEvent.action == KeyEvent.ACTION_UP && i == KeyEvent.KEYCODE_BACK) {
+                    backPressed()
                 }
+                true
+            }
 
         if (showOtherFolderButton) {
             builder.setNeutralButton(R.string.other_folder) { dialogInterface, i -> showOtherFolder() }
         }
 
-        dialog = builder.create().apply {
-            activity.setupDialogStuff(view, this, R.string.select_destination) {
-                view.directories_show_hidden.beVisibleIf(!context.config.shouldShowHidden)
-                view.directories_show_hidden.setOnClickListener {
+        builder.apply {
+            activity.setupDialogStuff(binding.root, this, com.simplemobiletools.commons.R.string.select_destination) { alertDialog ->
+                dialog = alertDialog
+                binding.directoriesShowHidden.beVisibleIf(!context.config.shouldShowHidden)
+                binding.directoriesShowHidden.setOnClickListener {
                     activity.handleHiddenFolderPasswordProtection {
-                        view.directories_show_hidden.beGone()
+                        binding.directoriesShowHidden.beGone()
                         showHidden = true
                         fetchDirectories(true)
                     }
@@ -61,8 +81,78 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
         fetchDirectories(false)
     }
 
-    private fun fetchDirectories(forceShowHidden: Boolean) {
-        activity.getCachedDirectories(forceShowHidden = forceShowHidden) {
+    private fun configureSearchView() = with(searchView) {
+        updateHintText(context.getString(com.simplemobiletools.commons.R.string.search_folders))
+        searchEditText.imeOptions = EditorInfo.IME_ACTION_DONE
+
+        toggleHideOnScroll(!config.scrollHorizontally)
+        setupMenu()
+        setSearchViewListeners()
+        updateSearchViewUi()
+    }
+
+    private fun MySearchMenu.updateSearchViewUi() {
+        getToolbar().beInvisible()
+        updateColors()
+        setBackgroundColor(Color.TRANSPARENT)
+        searchViewAppBarLayout.setBackgroundColor(Color.TRANSPARENT)
+    }
+
+    private fun MySearchMenu.setSearchViewListeners() {
+        onSearchOpenListener = {
+            updateSearchViewLeftIcon(com.simplemobiletools.commons.R.drawable.ic_cross_vector)
+        }
+
+        onSearchClosedListener = {
+            searchEditText.clearFocus()
+            activity.hideKeyboard(searchEditText)
+            updateSearchViewLeftIcon(com.simplemobiletools.commons.R.drawable.ic_search_vector)
+        }
+
+        onSearchTextChangedListener = { text ->
+            filterFolderListBySearchQuery(text)
+        }
+    }
+
+    private fun updateSearchViewLeftIcon(iconResId: Int) = with(searchView.binding.topToolbarSearchIcon) {
+        post {
+            setImageResource(iconResId)
+        }
+    }
+
+    private fun filterFolderListBySearchQuery(query: String) {
+        val adapter = binding.directoriesGrid.adapter as? DirectoryAdapter
+        var dirsToShow = allDirectories
+        if (query.isNotEmpty()) {
+            dirsToShow = dirsToShow.filter { it.name.contains(query, true) }.toMutableList() as ArrayList
+        }
+        dirsToShow = activity.getSortedDirectories(dirsToShow)
+        checkPlaceholderVisibility(dirsToShow)
+
+        val filteredFolderListUpdated = adapter?.dirs != dirsToShow
+        if (filteredFolderListUpdated) {
+            adapter?.updateDirs(dirsToShow)
+
+            binding.directoriesGrid.apply {
+                post {
+                    scrollToPosition(0)
+                }
+            }
+        }
+    }
+
+    private fun checkPlaceholderVisibility(dirs: ArrayList<Directory>) = with(binding) {
+        directoriesEmptyPlaceholder.beVisibleIf(dirs.isEmpty())
+
+        if (folderSearchView.isSearchOpen) {
+            directoriesEmptyPlaceholder.text = root.context.getString(com.simplemobiletools.commons.R.string.no_items_found)
+        }
+
+        directoriesFastscroller.beVisibleIf(directoriesEmptyPlaceholder.isGone())
+    }
+
+    private fun fetchDirectories(forceShowHiddenAndExcluded: Boolean) {
+        activity.getCachedDirectories(forceShowHidden = forceShowHiddenAndExcluded, forceShowExcluded = forceShowHiddenAndExcluded) {
             if (it.isNotEmpty()) {
                 it.forEach {
                     it.subfoldersMediaCount = it.mediaCnt
@@ -76,7 +166,16 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
     }
 
     private fun showOtherFolder() {
-        FilePickerDialog(activity, sourcePath, false, showHidden, true, true) {
+        activity.hideKeyboard(searchEditText)
+        FilePickerDialog(
+            activity,
+            activity.getDefaultCopyDestinationPath(showHidden, sourcePath),
+            !isPickingCopyMoveDestination && !isPickingFolderForWidget,
+            showHidden,
+            true,
+            true
+        ) {
+            config.lastCopyPath = it
             activity.handleLockedFolderOpening(it) { success ->
                 if (success) {
                     callback(it)
@@ -90,7 +189,8 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
             allDirectories = newDirs.clone() as ArrayList<Directory>
         }
 
-        val distinctDirs = newDirs.filter { showFavoritesBin || (!it.isRecycleBin() && !it.areFavorites()) }.distinctBy { it.path.getDistinctPath() }.toMutableList() as ArrayList<Directory>
+        val distinctDirs = newDirs.filter { showFavoritesBin || (!it.isRecycleBin() && !it.areFavorites()) }.distinctBy { it.path.getDistinctPath() }
+            .toMutableList() as ArrayList<Directory>
         val sortedDirs = activity.getSortedDirectories(distinctDirs)
         val dirs = activity.getDirsToShow(sortedDirs, allDirectories, currentPathPrefix).clone() as ArrayList<Directory>
         if (dirs.hashCode() == shownDirectories.hashCode()) {
@@ -98,12 +198,15 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
         }
 
         shownDirectories = dirs
-        val adapter = DirectoryAdapter(activity, dirs.clone() as ArrayList<Directory>, null, view.directories_grid, true) {
+        val adapter = DirectoryAdapter(activity, dirs.clone() as ArrayList<Directory>, null, binding.directoriesGrid, true) {
             val clickedDir = it as Directory
             val path = clickedDir.path
             if (clickedDir.subfoldersCount == 1 || !activity.config.groupDirectSubfolders) {
-                if (path.trimEnd('/') == sourcePath) {
-                    activity.toast(R.string.source_and_destination_same)
+                if (isPickingCopyMoveDestination && path.trimEnd('/') == sourcePath) {
+                    activity.toast(com.simplemobiletools.commons.R.string.source_and_destination_same)
+                    return@DirectoryAdapter
+                } else if (isPickingCopyMoveDestination && activity.isRestrictedWithSAFSdk30(path) && !activity.isInDownloadDir(path)) {
+                    activity.toast(com.simplemobiletools.commons.R.string.system_folder_copy_restriction, Toast.LENGTH_LONG)
                     return@DirectoryAdapter
                 } else {
                     activity.handleLockedFolderOpening(path) { success ->
@@ -111,7 +214,7 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
                             callback(path)
                         }
                     }
-                    dialog.dismiss()
+                    dialog?.dismiss()
                 }
             } else {
                 currentPathPrefix = path
@@ -121,41 +224,25 @@ class PickDirectoryDialog(val activity: BaseSimpleActivity, val sourcePath: Stri
         }
 
         val scrollHorizontally = activity.config.scrollHorizontally && isGridViewType
-        val sorting = activity.config.directorySorting
-        view.apply {
-            directories_grid.adapter = adapter
-
-            directories_vertical_fastscroller.isHorizontal = false
-            directories_vertical_fastscroller.beGoneIf(scrollHorizontally)
-
-            directories_horizontal_fastscroller.isHorizontal = true
-            directories_horizontal_fastscroller.beVisibleIf(scrollHorizontally)
-
-            if (scrollHorizontally) {
-                directories_horizontal_fastscroller.allowBubbleDisplay = activity.config.showInfoBubble
-                directories_horizontal_fastscroller.setViews(directories_grid) {
-                    directories_horizontal_fastscroller.updateBubbleText(dirs[it].getBubbleText(sorting, activity))
-                }
-            } else {
-                directories_vertical_fastscroller.allowBubbleDisplay = activity.config.showInfoBubble
-                directories_vertical_fastscroller.setViews(directories_grid) {
-                    directories_vertical_fastscroller.updateBubbleText(dirs[it].getBubbleText(sorting, activity))
-                }
-            }
+        binding.apply {
+            directoriesGrid.adapter = adapter
+            directoriesFastscroller.setScrollVertically(!scrollHorizontally)
         }
     }
 
     private fun backPressed() {
-        if (activity.config.groupDirectSubfolders) {
+        if (searchView.isSearchOpen) {
+            searchView.closeSearch()
+        } else if (activity.config.groupDirectSubfolders) {
             if (currentPathPrefix.isEmpty()) {
-                dialog.dismiss()
+                dialog?.dismiss()
             } else {
-                openedSubfolders.removeAt(openedSubfolders.size - 1)
+                openedSubfolders.removeLast()
                 currentPathPrefix = openedSubfolders.last()
                 gotDirectories(allDirectories)
             }
         } else {
-            dialog.dismiss()
+            dialog?.dismiss()
         }
     }
 }

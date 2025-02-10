@@ -1,23 +1,30 @@
 package com.simplemobiletools.gallery.pro.extensions
 
-import android.media.MediaMetadataRetriever
 import android.os.Environment
-import com.simplemobiletools.commons.extensions.doesThisOrParentHaveNoMedia
+import com.simplemobiletools.commons.extensions.isExternalStorageManager
 import com.simplemobiletools.commons.helpers.NOMEDIA
+import com.simplemobiletools.commons.helpers.isRPlus
 import java.io.File
 import java.io.IOException
 
-fun String.isThisOrParentIncluded(includedPaths: MutableSet<String>) = includedPaths.any { equals(it, true) } || includedPaths.any { "$this/".startsWith("$it/", true) }
+fun String.isThisOrParentIncluded(includedPaths: MutableSet<String>) =
+    includedPaths.any { equals(it, true) } || includedPaths.any { "$this/".startsWith("$it/", true) }
 
-fun String.isThisOrParentExcluded(excludedPaths: MutableSet<String>) = excludedPaths.any { equals(it, true) } || excludedPaths.any { "$this/".startsWith("$it/", true) }
+fun String.isThisOrParentExcluded(excludedPaths: MutableSet<String>) =
+    excludedPaths.any { equals(it, true) } || excludedPaths.any { "$this/".startsWith("$it/", true) }
 
-fun String.shouldFolderBeVisible(excludedPaths: MutableSet<String>, includedPaths: MutableSet<String>, showHidden: Boolean): Boolean {
+// cache which folders contain .nomedia files to avoid checking them over and over again
+fun String.shouldFolderBeVisible(
+    excludedPaths: MutableSet<String>, includedPaths: MutableSet<String>, showHidden: Boolean,
+    folderNoMediaStatuses: HashMap<String, Boolean>, callback: (path: String, hasNoMedia: Boolean) -> Unit
+): Boolean {
     if (isEmpty()) {
         return false
     }
 
     val file = File(this)
-    if (file.name.startsWith("img_", true)) {
+    val filename = file.name
+    if (filename.startsWith("img_", true) && file.isDirectory) {
         val files = file.list()
         if (files != null) {
             if (files.any { it.contains("burst", true) }) {
@@ -26,7 +33,7 @@ fun String.shouldFolderBeVisible(excludedPaths: MutableSet<String>, includedPath
         }
     }
 
-    if (!showHidden && file.isHidden) {
+    if (!showHidden && filename.startsWith('.')) {
         return false
     } else if (includedPaths.contains(this)) {
         return true
@@ -35,7 +42,7 @@ fun String.shouldFolderBeVisible(excludedPaths: MutableSet<String>, includedPath
     val containsNoMedia = if (showHidden) {
         false
     } else {
-        File(this, NOMEDIA).exists()
+        folderNoMediaStatuses.getOrElse("$this/$NOMEDIA") { false } || ((!isRPlus() || isExternalStorageManager()) && File(this, NOMEDIA).exists())
     }
 
     return if (!showHidden && containsNoMedia) {
@@ -46,10 +53,27 @@ fun String.shouldFolderBeVisible(excludedPaths: MutableSet<String>, includedPath
         true
     } else if (isThisOrParentExcluded(excludedPaths)) {
         false
-    } else if (!showHidden && file.isDirectory && file.canonicalFile == file.absoluteFile) {
+    } else if (!showHidden) {
         var containsNoMediaOrDot = containsNoMedia || contains("/.")
         if (!containsNoMediaOrDot) {
-            containsNoMediaOrDot = file.doesThisOrParentHaveNoMedia()
+            var curPath = this
+            for (i in 0 until count { it == '/' } - 1) {
+                curPath = curPath.substringBeforeLast('/')
+                val pathToCheck = "$curPath/$NOMEDIA"
+                if (folderNoMediaStatuses.contains(pathToCheck)) {
+                    if (folderNoMediaStatuses[pathToCheck] == true) {
+                        containsNoMediaOrDot = true
+                        break
+                    }
+                } else {
+                    val noMediaExists = folderNoMediaStatuses.getOrElse(pathToCheck, { false }) || File(pathToCheck).exists()
+                    callback(pathToCheck, noMediaExists)
+                    if (noMediaExists) {
+                        containsNoMediaOrDot = true
+                        break
+                    }
+                }
+            }
         }
         !containsNoMediaOrDot
     } else {
@@ -66,15 +90,19 @@ fun String.getDistinctPath(): String {
     }
 }
 
-fun String.getVideoDuration(): Int {
-    var seconds = 0
-    try {
-        val retriever = MediaMetadataRetriever()
-        retriever.setDataSource(this)
-        seconds = Math.round(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION).toInt() / 1000f)
-    } catch (e: Exception) {
-    }
-    return seconds
-}
-
 fun String.isDownloadsFolder() = equals(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString(), true)
+
+fun String.isThisOrParentFolderHidden(): Boolean {
+    var curFile = File(this)
+    while (true) {
+        if (curFile.isHidden) {
+            return true
+        }
+
+        curFile = curFile.parentFile ?: break
+        if (curFile.absolutePath == "/") {
+            break
+        }
+    }
+    return false
+}

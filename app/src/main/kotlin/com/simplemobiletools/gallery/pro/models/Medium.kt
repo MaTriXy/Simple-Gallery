@@ -1,38 +1,42 @@
 package com.simplemobiletools.gallery.pro.models
 
 import android.content.Context
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-import com.simplemobiletools.commons.extensions.formatDate
-import com.simplemobiletools.commons.extensions.formatSize
-import com.simplemobiletools.commons.extensions.getFilenameExtension
-import com.simplemobiletools.commons.helpers.SORT_BY_DATE_MODIFIED
-import com.simplemobiletools.commons.helpers.SORT_BY_NAME
-import com.simplemobiletools.commons.helpers.SORT_BY_PATH
-import com.simplemobiletools.commons.helpers.SORT_BY_SIZE
+import androidx.room.*
+import com.bumptech.glide.signature.ObjectKey
+import com.simplemobiletools.commons.extensions.*
+import com.simplemobiletools.commons.helpers.*
+import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.gallery.pro.helpers.*
+import java.io.File
 import java.io.Serializable
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 @Entity(tableName = "media", indices = [(Index(value = ["full_path"], unique = true))])
 data class Medium(
-        @PrimaryKey(autoGenerate = true) var id: Long?,
-        @ColumnInfo(name = "filename") var name: String,
-        @ColumnInfo(name = "full_path") var path: String,
-        @ColumnInfo(name = "parent_path") var parentPath: String,
-        @ColumnInfo(name = "last_modified") val modified: Long,
-        @ColumnInfo(name = "date_taken") var taken: Long,
-        @ColumnInfo(name = "size") val size: Long,
-        @ColumnInfo(name = "type") val type: Int,
-        @ColumnInfo(name = "video_duration") val videoDuration: Int,
-        @ColumnInfo(name = "is_favorite") var isFavorite: Boolean,
-        @ColumnInfo(name = "deleted_ts") var deletedTS: Long) : Serializable, ThumbnailItem() {
+    @PrimaryKey(autoGenerate = true) var id: Long?,
+    @ColumnInfo(name = "filename") var name: String,
+    @ColumnInfo(name = "full_path") var path: String,
+    @ColumnInfo(name = "parent_path") var parentPath: String,
+    @ColumnInfo(name = "last_modified") var modified: Long,
+    @ColumnInfo(name = "date_taken") var taken: Long,
+    @ColumnInfo(name = "size") var size: Long,
+    @ColumnInfo(name = "type") var type: Int,
+    @ColumnInfo(name = "video_duration") var videoDuration: Int,
+    @ColumnInfo(name = "is_favorite") var isFavorite: Boolean,
+    @ColumnInfo(name = "deleted_ts") var deletedTS: Long,
+    @ColumnInfo(name = "media_store_id") var mediaStoreId: Long,
+
+    @Ignore var gridPosition: Int = 0   // used at grid view decoration at Grouping enabled
+) : Serializable, ThumbnailItem() {
+
+    constructor() : this(null, "", "", "", 0L, 0L, 0L, 0, 0, false, 0L, 0L, 0)
 
     companion object {
         private const val serialVersionUID = -6553149366975655L
     }
+
+    fun isWebP() = name.isWebP()
 
     fun isGIF() = type == TYPE_GIFS
 
@@ -46,13 +50,18 @@ data class Medium(
 
     fun isPortrait() = type == TYPE_PORTRAITS
 
+    fun isApng() = name.isApng()
+
     fun isHidden() = name.startsWith('.')
 
-    fun getBubbleText(sorting: Int, context: Context) = when {
+    fun isHeic() = name.toLowerCase().endsWith(".heic") || name.toLowerCase().endsWith(".heif")
+
+    fun getBubbleText(sorting: Int, context: Context, dateFormat: String, timeFormat: String) = when {
         sorting and SORT_BY_NAME != 0 -> name
         sorting and SORT_BY_PATH != 0 -> path
         sorting and SORT_BY_SIZE != 0 -> size.formatSize()
-        sorting and SORT_BY_DATE_MODIFIED != 0 -> modified.formatDate(context)
+        sorting and SORT_BY_DATE_MODIFIED != 0 -> modified.formatDate(context, dateFormat, timeFormat)
+        sorting and SORT_BY_RANDOM != 0 -> name
         else -> taken.formatDate(context)
     }
 
@@ -86,4 +95,18 @@ data class Medium(
 
         return calendar.timeInMillis.toString()
     }
+
+    fun getSignature(): String {
+        val lastModified = if (modified > 1) {
+            modified
+        } else {
+            File(path).lastModified()
+        }
+
+        return "$path-$lastModified-$size"
+    }
+
+    fun getKey() = ObjectKey(getSignature())
+
+    fun toFileDirItem() = FileDirItem(path, name, false, 0, size, modified, mediaStoreId)
 }

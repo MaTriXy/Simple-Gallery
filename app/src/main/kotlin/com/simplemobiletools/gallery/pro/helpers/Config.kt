@@ -5,12 +5,10 @@ import android.content.res.Configuration
 import android.os.Environment
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.simplemobiletools.commons.helpers.BaseConfig
-import com.simplemobiletools.commons.helpers.SORT_BY_DATE_MODIFIED
-import com.simplemobiletools.commons.helpers.SORT_DESCENDING
+import com.simplemobiletools.commons.helpers.*
 import com.simplemobiletools.gallery.pro.R
 import com.simplemobiletools.gallery.pro.models.AlbumCover
-import java.util.*
+import java.util.Arrays
 
 class Config(context: Context) : BaseConfig(context) {
     companion object {
@@ -73,6 +71,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(TEMPORARILY_SHOW_HIDDEN, false)
         set(temporarilyShowHidden) = prefs.edit().putBoolean(TEMPORARILY_SHOW_HIDDEN, temporarilyShowHidden).apply()
 
+    var temporarilyShowExcluded: Boolean
+        get() = prefs.getBoolean(TEMPORARILY_SHOW_EXCLUDED, false)
+        set(temporarilyShowExcluded) = prefs.edit().putBoolean(TEMPORARILY_SHOW_EXCLUDED, temporarilyShowExcluded).apply()
+
     var isThirdPartyIntent: Boolean
         get() = prefs.getBoolean(IS_THIRD_PARTY_INTENT, false)
         set(isThirdPartyIntent) = prefs.edit().putBoolean(IS_THIRD_PARTY_INTENT, isThirdPartyIntent).apply()
@@ -120,6 +122,18 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getStringSet(EXCLUDED_FOLDERS, HashSet())!!
         set(excludedFolders) = prefs.edit().remove(EXCLUDED_FOLDERS).putStringSet(EXCLUDED_FOLDERS, excludedFolders).apply()
 
+    var isExcludedPasswordProtectionOn: Boolean
+        get() = prefs.getBoolean(EXCLUDED_PASSWORD_PROTECTION, false)
+        set(isExcludedPasswordProtectionOn) = prefs.edit().putBoolean(EXCLUDED_PASSWORD_PROTECTION, isExcludedPasswordProtectionOn).apply()
+
+    var excludedPasswordHash: String
+        get() = prefs.getString(EXCLUDED_PASSWORD_HASH, "")!!
+        set(excludedPasswordHash) = prefs.edit().putString(EXCLUDED_PASSWORD_HASH, excludedPasswordHash).apply()
+
+    var excludedProtectionType: Int
+        get() = prefs.getInt(EXCLUDED_PROTECTION_TYPE, PROTECTION_PATTERN)
+        set(excludedProtectionType) = prefs.edit().putInt(EXCLUDED_PROTECTION_TYPE, excludedProtectionType).apply()
+
     fun addIncludedFolder(path: String) {
         val currIncludedFolders = HashSet<String>(includedFolders)
         currIncludedFolders.add(path)
@@ -166,12 +180,16 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(SHOW_THUMBNAIL_FILE_TYPES, true)
         set(showThumbnailFileTypes) = prefs.edit().putBoolean(SHOW_THUMBNAIL_FILE_TYPES, showThumbnailFileTypes).apply()
 
+    var markFavoriteItems: Boolean
+        get() = prefs.getBoolean(MARK_FAVORITE_ITEMS, true)
+        set(markFavoriteItems) = prefs.edit().putBoolean(MARK_FAVORITE_ITEMS, markFavoriteItems).apply()
+
     var screenRotation: Int
         get() = prefs.getInt(SCREEN_ROTATION, ROTATE_BY_SYSTEM_SETTING)
         set(screenRotation) = prefs.edit().putInt(SCREEN_ROTATION, screenRotation).apply()
 
     var fileLoadingPriority: Int
-        get() = prefs.getInt(FILE_LOADING_PRIORITY, PRIORITY_COMPROMISE)
+        get() = prefs.getInt(FILE_LOADING_PRIORITY, PRIORITY_SPEED)
         set(fileLoadingPriority) = prefs.edit().putInt(FILE_LOADING_PRIORITY, fileLoadingPriority).apply()
 
     var loopVideos: Boolean
@@ -191,12 +209,16 @@ class Config(context: Context) : BaseConfig(context) {
         set(blackBackground) = prefs.edit().putBoolean(BLACK_BACKGROUND, blackBackground).apply()
 
     var filterMedia: Int
-        get() = prefs.getInt(FILTER_MEDIA, TYPE_DEFAULT_FILTER)
+        get() = prefs.getInt(FILTER_MEDIA, getDefaultFileFilter())
         set(filterMedia) = prefs.edit().putInt(FILTER_MEDIA, filterMedia).apply()
 
     var dirColumnCnt: Int
         get() = prefs.getInt(getDirectoryColumnsField(), getDefaultDirectoryColumnCount())
         set(dirColumnCnt) = prefs.edit().putInt(getDirectoryColumnsField(), dirColumnCnt).apply()
+
+    var defaultFolder: String
+        get() = prefs.getString(DEFAULT_FOLDER, "")!!
+        set(defaultFolder) = prefs.edit().putString(DEFAULT_FOLDER, defaultFolder).apply()
 
     var allowInstantChange: Boolean
         get() = prefs.getBoolean(ALLOW_INSTANT_CHANGE, false)
@@ -219,8 +241,13 @@ class Config(context: Context) : BaseConfig(context) {
         }
     }
 
-    private fun getDefaultDirectoryColumnCount() = context.resources.getInteger(if (scrollHorizontally) R.integer.directory_columns_horizontal_scroll
-    else R.integer.directory_columns_vertical_scroll)
+    private fun getDefaultDirectoryColumnCount() = context.resources.getInteger(
+        if (scrollHorizontally) {
+            R.integer.directory_columns_horizontal_scroll
+        } else {
+            R.integer.directory_columns_vertical_scroll
+        }
+    )
 
     var mediaColumnCnt: Int
         get() = prefs.getInt(getMediaColumnsField(), getDefaultMediaColumnCount())
@@ -243,8 +270,13 @@ class Config(context: Context) : BaseConfig(context) {
         }
     }
 
-    private fun getDefaultMediaColumnCount() = context.resources.getInteger(if (scrollHorizontally) R.integer.media_columns_horizontal_scroll
-    else R.integer.media_columns_vertical_scroll)
+    private fun getDefaultMediaColumnCount() = context.resources.getInteger(
+        if (scrollHorizontally) {
+            R.integer.media_columns_horizontal_scroll
+        } else {
+            R.integer.media_columns_vertical_scroll
+        }
+    )
 
     var albumCovers: String
         get() = prefs.getString(ALBUM_COVERS, "")!!
@@ -270,10 +302,6 @@ class Config(context: Context) : BaseConfig(context) {
     var allowVideoGestures: Boolean
         get() = prefs.getBoolean(ALLOW_VIDEO_GESTURES, true)
         set(allowVideoGestures) = prefs.edit().putBoolean(ALLOW_VIDEO_GESTURES, allowVideoGestures).apply()
-
-    var showMediaCount: Boolean
-        get() = prefs.getBoolean(SHOW_MEDIA_COUNT, true)
-        set(showMediaCount) = prefs.edit().putBoolean(SHOW_MEDIA_COUNT, showMediaCount).apply()
 
     var slideshowInterval: Int
         get() = prefs.getInt(SLIDESHOW_INTERVAL, SLIDESHOW_DEFAULT_INTERVAL)
@@ -339,6 +367,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(TEMP_SKIP_DELETE_CONFIRMATION, false)
         set(tempSkipDeleteConfirmation) = prefs.edit().putBoolean(TEMP_SKIP_DELETE_CONFIRMATION, tempSkipDeleteConfirmation).apply()
 
+    var tempSkipRecycleBin: Boolean
+        get() = prefs.getBoolean(TEMP_SKIP_RECYCLE_BIN, false)
+        set(tempSkipRecycleBin) = prefs.edit().putBoolean(TEMP_SKIP_RECYCLE_BIN, tempSkipRecycleBin).apply()
+
     var wereFavoritesPinned: Boolean
         get() = prefs.getBoolean(WERE_FAVORITES_PINNED, false)
         set(wereFavoritesPinned) = prefs.edit().putBoolean(WERE_FAVORITES_PINNED, wereFavoritesPinned).apply()
@@ -400,11 +432,19 @@ class Config(context: Context) : BaseConfig(context) {
         set(everShownFolders) = prefs.edit().putStringSet(EVER_SHOWN_FOLDERS, everShownFolders).apply()
 
     private fun getEverShownFolders() = hashSetOf(
-            internalStoragePath,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).absolutePath,
-            "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).absolutePath}/Screenshots"
+        internalStoragePath,
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath,
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath,
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).absolutePath,
+        "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).absolutePath}/Screenshots",
+        "$internalStoragePath/WhatsApp/Media/WhatsApp Images",
+        "$internalStoragePath/WhatsApp/Media/WhatsApp Images/Sent",
+        "$internalStoragePath/WhatsApp/Media/WhatsApp Video",
+        "$internalStoragePath/WhatsApp/Media/WhatsApp Video/Sent",
+        "$internalStoragePath/WhatsApp/Media/.Statuses",
+        "$internalStoragePath/Android/media/com.whatsapp/WhatsApp/Media",
+        "$internalStoragePath/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images",
+        "$internalStoragePath/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video"
     )
 
     var showRecycleBinAtFolders: Boolean
@@ -490,4 +530,40 @@ class Config(context: Context) : BaseConfig(context) {
     var wereFavoritesMigrated: Boolean
         get() = prefs.getBoolean(WERE_FAVORITES_MIGRATED, false)
         set(wereFavoritesMigrated) = prefs.edit().putBoolean(WERE_FAVORITES_MIGRATED, wereFavoritesMigrated).apply()
+
+    var showFolderMediaCount: Int
+        get() = prefs.getInt(FOLDER_MEDIA_COUNT, FOLDER_MEDIA_CNT_LINE)
+        set(showFolderMediaCount) = prefs.edit().putInt(FOLDER_MEDIA_COUNT, showFolderMediaCount).apply()
+
+    var folderStyle: Int
+        get() = prefs.getInt(FOLDER_THUMBNAIL_STYLE, FOLDER_STYLE_SQUARE)
+        set(folderStyle) = prefs.edit().putInt(FOLDER_THUMBNAIL_STYLE, folderStyle).apply()
+
+    var limitFolderTitle: Boolean
+        get() = prefs.getBoolean(LIMIT_FOLDER_TITLE, false)
+        set(limitFolderTitle) = prefs.edit().putBoolean(LIMIT_FOLDER_TITLE, limitFolderTitle).apply()
+
+    var thumbnailSpacing: Int
+        get() = prefs.getInt(THUMBNAIL_SPACING, 1)
+        set(thumbnailSpacing) = prefs.edit().putInt(THUMBNAIL_SPACING, thumbnailSpacing).apply()
+
+    var fileRoundedCorners: Boolean
+        get() = prefs.getBoolean(FILE_ROUNDED_CORNERS, false)
+        set(fileRoundedCorners) = prefs.edit().putBoolean(FILE_ROUNDED_CORNERS, fileRoundedCorners).apply()
+
+    var customFoldersOrder: String
+        get() = prefs.getString(CUSTOM_FOLDERS_ORDER, "")!!
+        set(customFoldersOrder) = prefs.edit().putString(CUSTOM_FOLDERS_ORDER, customFoldersOrder).apply()
+
+    var avoidShowingAllFilesPrompt: Boolean
+        get() = prefs.getBoolean(AVOID_SHOWING_ALL_FILES_PROMPT, false)
+        set(avoidShowingAllFilesPrompt) = prefs.edit().putBoolean(AVOID_SHOWING_ALL_FILES_PROMPT, avoidShowingAllFilesPrompt).apply()
+
+    var searchAllFilesByDefault: Boolean
+        get() = prefs.getBoolean(SEARCH_ALL_FILES_BY_DEFAULT, false)
+        set(searchAllFilesByDefault) = prefs.edit().putBoolean(SEARCH_ALL_FILES_BY_DEFAULT, searchAllFilesByDefault).apply()
+
+    var lastExportedFavoritesFolder: String
+        get() = prefs.getString(LAST_EXPORTED_FAVORITES_FOLDER, "")!!
+        set(lastExportedFavoritesFolder) = prefs.edit().putString(LAST_EXPORTED_FAVORITES_FOLDER, lastExportedFavoritesFolder).apply()
 }

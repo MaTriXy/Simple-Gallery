@@ -39,8 +39,10 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
     private lateinit var slideInfoView: TextView
     private lateinit var singleTap: (Float, Float) -> Unit
 
-    fun initialize(activity: Activity, slideInfoView: TextView, isBrightness: Boolean, parentView: ViewGroup?, singleTap: (x: Float, y: Float) -> Unit,
-                   doubleTap: ((x: Float, y: Float) -> Unit)? = null) {
+    fun initialize(
+        activity: Activity, slideInfoView: TextView, isBrightness: Boolean, parentView: ViewGroup?, singleTap: (x: Float, y: Float) -> Unit,
+        doubleTap: ((x: Float, y: Float) -> Unit)? = null
+    ) {
         this.activity = activity
         this.slideInfoView = slideInfoView
         this.singleTap = singleTap
@@ -54,15 +56,13 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
     }
 
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-            if (e != null) {
-                singleTap(e.rawX, e.rawY)
-            }
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+            singleTap(e.rawX, e.rawY)
             return true
         }
 
-        override fun onDoubleTap(e: MotionEvent?): Boolean {
-            if (e != null && doubleTap != null) {
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            if (doubleTap != null) {
                 doubleTap!!.invoke(e.rawX, e.rawY)
             }
             return true
@@ -87,9 +87,9 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
         gestureDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                mTouchDownX = event.x
-                mTouchDownY = event.y
-                mLastTouchY = event.y
+                mTouchDownX = event.rawX
+                mTouchDownY = event.rawY
+                mLastTouchY = event.rawY
                 mTouchDownTime = System.currentTimeMillis()
                 if (mIsBrightnessScroll) {
                     if (mTouchDownValue == -1) {
@@ -99,16 +99,17 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
                     mTouchDownValue = getCurrentVolume()
                 }
             }
+
             MotionEvent.ACTION_MOVE -> {
-                val diffX = mTouchDownX - event.x
-                val diffY = mTouchDownY - event.y
+                val diffX = mTouchDownX - event.rawX
+                val diffY = mTouchDownY - event.rawY
 
                 if (Math.abs(diffY) > dragThreshold && Math.abs(diffY) > Math.abs(diffX)) {
                     var percent = ((diffY / mViewHeight) * 100).toInt() * 3
                     percent = Math.min(100, Math.max(-100, percent))
 
-                    if ((percent == 100 && event.y > mLastTouchY) || (percent == -100 && event.y < mLastTouchY)) {
-                        mTouchDownY = event.y
+                    if ((percent == 100 && event.rawY > mLastTouchY) || (percent == -100 && event.rawY < mLastTouchY)) {
+                        mTouchDownY = event.rawY
                         mTouchDownValue = if (mIsBrightnessScroll) mTempBrightness else getCurrentVolume()
                     }
 
@@ -116,15 +117,16 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
                 } else if (Math.abs(diffX) > dragThreshold || Math.abs(diffY) > dragThreshold) {
                     if (!mPassTouches) {
                         event.action = MotionEvent.ACTION_DOWN
-                        event.setLocation(event.rawX, event.y)
+                        event.setLocation(event.rawX, event.rawY)
                         mParentView?.dispatchTouchEvent(event)
                     }
                     mPassTouches = true
                     mParentView?.dispatchTouchEvent(event)
                     return false
                 }
-                mLastTouchY = event.y
+                mLastTouchY = event.rawY
             }
+
             MotionEvent.ACTION_UP -> {
                 if (mIsBrightnessScroll) {
                     mTouchDownValue = mTempBrightness
@@ -156,6 +158,10 @@ class MediaSideScroll(context: Context, attrs: AttributeSet) : RelativeLayout(co
         val stream = AudioManager.STREAM_MUSIC
         val maxVolume = activity!!.audioManager.getStreamMaxVolume(stream)
         val percentPerPoint = 100 / maxVolume
+        if (percentPerPoint == 0) {
+            return
+        }
+
         val addPoints = percent / percentPerPoint
         val newVolume = Math.min(maxVolume, Math.max(0, mTouchDownValue + addPoints))
         activity!!.audioManager.setStreamVolume(stream, newVolume, 0)

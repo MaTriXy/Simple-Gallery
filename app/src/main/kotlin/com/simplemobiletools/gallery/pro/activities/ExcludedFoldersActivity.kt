@@ -1,48 +1,64 @@
 package com.simplemobiletools.gallery.pro.activities
 
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import com.simplemobiletools.commons.dialogs.FilePickerDialog
-import com.simplemobiletools.commons.extensions.beVisibleIf
+import com.simplemobiletools.commons.extensions.*
+import com.simplemobiletools.commons.helpers.NavigationIcon
+import com.simplemobiletools.commons.helpers.isRPlus
 import com.simplemobiletools.commons.interfaces.RefreshRecyclerViewListener
 import com.simplemobiletools.gallery.pro.R
 import com.simplemobiletools.gallery.pro.adapters.ManageFoldersAdapter
+import com.simplemobiletools.gallery.pro.databinding.ActivityManageFoldersBinding
 import com.simplemobiletools.gallery.pro.extensions.config
-import kotlinx.android.synthetic.main.activity_manage_folders.*
 
 class ExcludedFoldersActivity : SimpleActivity(), RefreshRecyclerViewListener {
+
+    private val binding by viewBinding(ActivityManageFoldersBinding::inflate)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        isMaterialActivity = true
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_manage_folders)
+        setContentView(binding.root)
         updateFolders()
+        setupOptionsMenu()
+        binding.manageFoldersToolbar.title = getString(com.simplemobiletools.commons.R.string.excluded_folders)
+
+        updateMaterialActivityViews(binding.manageFoldersCoordinator, binding.manageFoldersList, useTransparentNavigation = true, useTopSearchMenu = false)
+        setupMaterialScrollListener(binding.manageFoldersList, binding.manageFoldersToolbar)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        setupToolbar(binding.manageFoldersToolbar, NavigationIcon.Arrow)
     }
 
     private fun updateFolders() {
         val folders = ArrayList<String>()
         config.excludedFolders.mapTo(folders) { it }
-        manage_folders_placeholder.apply {
-            text = getString(R.string.excluded_activity_placeholder)
+        var placeholderText = getString(R.string.excluded_activity_placeholder)
+        binding.manageFoldersPlaceholder.apply {
             beVisibleIf(folders.isEmpty())
-            setTextColor(config.textColor)
+            setTextColor(getProperTextColor())
+
+            if (isRPlus() && !isExternalStorageManager()) {
+                placeholderText = placeholderText.substringBefore("\n")
+            }
+
+            text = placeholderText
         }
 
-        val adapter = ManageFoldersAdapter(this, folders, true, this, manage_folders_list) {}
-        manage_folders_list.adapter = adapter
+        val adapter = ManageFoldersAdapter(this, folders, true, this, binding.manageFoldersList) {}
+        binding.manageFoldersList.adapter = adapter
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_add_folder, menu)
-        updateMenuItemColors(menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.add_folder -> addFolder()
-            else -> return super.onOptionsItemSelected(item)
+    private fun setupOptionsMenu() {
+        binding.manageFoldersToolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.add_folder -> addFolder()
+                else -> return@setOnMenuItemClickListener false
+            }
+            return@setOnMenuItemClickListener true
         }
-        return true
     }
 
     override fun refreshItems() {
@@ -50,7 +66,15 @@ class ExcludedFoldersActivity : SimpleActivity(), RefreshRecyclerViewListener {
     }
 
     private fun addFolder() {
-        FilePickerDialog(this, config.lastFilepickerPath, false, config.shouldShowHidden, false, true, true) {
+        FilePickerDialog(
+            activity = this,
+            internalStoragePath,
+            pickFile = false,
+            config.shouldShowHidden,
+            showFAB = false,
+            canAddShowHiddenButton = true,
+            enforceStorageRestrictions = false,
+        ) {
             config.lastFilepickerPath = it
             config.addExcludedFolder(it)
             updateFolders()

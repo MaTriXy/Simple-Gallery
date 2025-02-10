@@ -1,6 +1,6 @@
 package com.simplemobiletools.gallery.pro.helpers
 
-import com.simplemobiletools.commons.helpers.MONTH_SECONDS
+import com.simplemobiletools.commons.helpers.*
 
 // shared preferences
 const val DIRECTORY_SORT_ORDER = "directory_sort_order"
@@ -8,6 +8,10 @@ const val GROUP_FOLDER_PREFIX = "group_folder_"
 const val VIEW_TYPE_PREFIX = "view_type_folder_"
 const val SHOW_HIDDEN_MEDIA = "show_hidden_media"
 const val TEMPORARILY_SHOW_HIDDEN = "temporarily_show_hidden"
+const val TEMPORARILY_SHOW_EXCLUDED = "temporarily_show_excluded"
+const val EXCLUDED_PASSWORD_PROTECTION = "excluded_password_protection"
+const val EXCLUDED_PASSWORD_HASH = "excluded_password_hash"
+const val EXCLUDED_PROTECTION_TYPE = "excluded_protection_type"
 const val IS_THIRD_PARTY_INTENT = "is_third_party_intent"
 const val AUTOPLAY_VIDEOS = "autoplay_videos"
 const val REMEMBER_LAST_VIDEO_POSITION = "remember_last_video_position"
@@ -22,6 +26,7 @@ const val DISPLAY_FILE_NAMES = "display_file_names"
 const val BLACK_BACKGROUND = "dark_background"
 const val PINNED_FOLDERS = "pinned_folders"
 const val FILTER_MEDIA = "filter_media"
+const val DEFAULT_FOLDER = "default_folder"
 const val DIR_COLUMN_CNT = "dir_column_cnt"
 const val DIR_LANDSCAPE_COLUMN_CNT = "dir_landscape_column_cnt"
 const val DIR_HORIZONTAL_COLUMN_CNT = "dir_horizontal_column_cnt"
@@ -39,7 +44,6 @@ const val HIDE_SYSTEM_UI = "hide_system_ui"
 const val DELETE_EMPTY_FOLDERS = "delete_empty_folders"
 const val ALLOW_PHOTO_GESTURES = "allow_photo_gestures"
 const val ALLOW_VIDEO_GESTURES = "allow_video_gestures"
-const val SHOW_MEDIA_COUNT = "show_media_count"
 const val TEMP_FOLDER_PATH = "temp_folder_path"
 const val VIEW_TYPE_FOLDERS = "view_type_folders"
 const val VIEW_TYPE_FILES = "view_type_files"
@@ -49,7 +53,9 @@ const val HIDE_EXTENDED_DETAILS = "hide_extended_details"
 const val ALLOW_INSTANT_CHANGE = "allow_instant_change"
 const val WAS_NEW_APP_SHOWN = "was_new_app_shown_clock"
 const val LAST_FILEPICKER_PATH = "last_filepicker_path"
+const val LAST_COPY_PATH = "last_copy_path"
 const val TEMP_SKIP_DELETE_CONFIRMATION = "temp_skip_delete_confirmation"
+const val TEMP_SKIP_RECYCLE_BIN = "temp_skip_recycle_bin"
 const val BOTTOM_ACTIONS = "bottom_actions"
 const val LAST_VIDEO_POSITION_PREFIX = "last_video_position_"
 const val VISIBLE_BOTTOM_ACTIONS = "visible_bottom_actions"
@@ -78,10 +84,20 @@ const val SHOW_NOTCH = "show_notch"
 const val FILE_LOADING_PRIORITY = "file_loading_priority"
 const val SPAM_FOLDERS_CHECKED = "spam_folders_checked"
 const val SHOW_THUMBNAIL_FILE_TYPES = "show_thumbnail_file_types"
+const val MARK_FAVORITE_ITEMS = "mark_favorite_items"
 const val EDITOR_BRUSH_COLOR = "editor_brush_color"
 const val EDITOR_BRUSH_HARDNESS = "editor_brush_hardness"
 const val EDITOR_BRUSH_SIZE = "editor_brush_size"
 const val WERE_FAVORITES_MIGRATED = "were_favorites_migrated"
+const val FOLDER_THUMBNAIL_STYLE = "folder_thumbnail_style"
+const val FOLDER_MEDIA_COUNT = "folder_media_count"
+const val LIMIT_FOLDER_TITLE = "folder_limit_title"
+const val THUMBNAIL_SPACING = "thumbnail_spacing"
+const val FILE_ROUNDED_CORNERS = "file_rounded_corners"
+const val CUSTOM_FOLDERS_ORDER = "custom_folders_order"
+const val AVOID_SHOWING_ALL_FILES_PROMPT = "avoid_showing_all_files_prompt"
+const val SEARCH_ALL_FILES_BY_DEFAULT = "search_all_files_by_default"
+const val LAST_EXPORTED_FAVORITES_FOLDER = "last_exported_favorites_folder"
 
 // slideshow
 const val SLIDESHOW_INTERVAL = "slideshow_interval"
@@ -101,10 +117,10 @@ const val SLIDESHOW_ANIMATION_NONE = 0
 const val SLIDESHOW_ANIMATION_SLIDE = 1
 const val SLIDESHOW_ANIMATION_FADE = 2
 
-const val FAVORITES = "favorites"
 const val RECYCLE_BIN = "recycle_bin"
 const val SHOW_FAVORITES = "show_favorites"
 const val SHOW_RECYCLE_BIN = "show_recycle_bin"
+const val IS_IN_RECYCLE_BIN = "is_in_recycle_bin"
 const val SHOW_NEXT_ITEM = "show_next_item"
 const val SHOW_PREV_ITEM = "show_prev_item"
 const val GO_TO_NEXT_ITEM = "go_to_next_item"
@@ -132,6 +148,7 @@ const val IS_VIEW_INTENT = "is_view_intent"
 const val PICKED_PATHS = "picked_paths"
 const val SHOULD_INIT_FRAGMENT = "should_init_fragment"
 const val PORTRAIT_PATH = "portrait_path"
+const val SKIP_AUTHENTICATION = "skip_authentication"
 
 // rotations
 const val ROTATE_BY_SYSTEM_SETTING = 0
@@ -142,10 +159,6 @@ const val ROTATE_BY_ASPECT_RATIO = 2
 const val PRIORITY_SPEED = 0
 const val PRIORITY_COMPROMISE = 1
 const val PRIORITY_VALIDITY = 2
-
-// view types
-const val VIEW_TYPE_GRID = 1
-const val VIEW_TYPE_LIST = 2
 
 // extended details values
 const val EXT_NAME = 1
@@ -168,7 +181,8 @@ const val TYPE_GIFS = 4
 const val TYPE_RAWS = 8
 const val TYPE_SVGS = 16
 const val TYPE_PORTRAITS = 32
-const val TYPE_DEFAULT_FILTER = TYPE_IMAGES or TYPE_VIDEOS or TYPE_GIFS or TYPE_RAWS or TYPE_SVGS or TYPE_PORTRAITS
+
+fun getDefaultFileFilter() = TYPE_IMAGES or TYPE_VIDEOS or TYPE_GIFS or TYPE_RAWS or TYPE_SVGS
 
 const val LOCATION_INTERNAL = 1
 const val LOCATION_SD = 2
@@ -183,6 +197,7 @@ const val GROUP_BY_FOLDER = 32
 const val GROUP_BY_LAST_MODIFIED_MONTHLY = 64
 const val GROUP_BY_DATE_TAKEN_MONTHLY = 128
 const val GROUP_DESCENDING = 1024
+const val GROUP_SHOW_FILE_COUNT = 2048
 
 // bottom actions
 const val BOTTOM_ACTION_TOGGLE_FAVORITE = 1
@@ -210,15 +225,36 @@ const val ASPECT_RATIO_FOUR_THREE = 2
 const val ASPECT_RATIO_SIXTEEN_NINE = 3
 const val ASPECT_RATIO_OTHER = 4
 
-// some constants related to zooming videos
-const val MIN_VIDEO_ZOOM_SCALE = 1f
-const val MAX_VIDEO_ZOOM_SCALE = 5f
-const val ZOOM_MODE_NONE = 0
-const val ZOOM_MODE_DRAG = 1
-const val ZOOM_MODE_ZOOM = 2
-
 // constants related to image quality
 const val LOW_TILE_DPI = 160
 const val NORMAL_TILE_DPI = 220
 const val WEIRD_TILE_DPI = 240
 const val HIGH_TILE_DPI = 280
+
+const val ROUNDED_CORNERS_NONE = 1
+const val ROUNDED_CORNERS_SMALL = 2
+const val ROUNDED_CORNERS_BIG = 3
+
+const val FOLDER_MEDIA_CNT_LINE = 1
+const val FOLDER_MEDIA_CNT_BRACKETS = 2
+const val FOLDER_MEDIA_CNT_NONE = 3
+
+const val FOLDER_STYLE_SQUARE = 1
+const val FOLDER_STYLE_ROUNDED_CORNERS = 2
+
+fun getPermissionToRequest() = if (isTiramisuPlus()) PERMISSION_READ_MEDIA_IMAGES else PERMISSION_WRITE_STORAGE
+
+fun getRequiredPermission() = if (isUpsideDownCakePlus()) PERMISSION_READ_MEDIA_VISUAL_USER_SELECTED else getPermissionToRequest()
+
+fun getPermissionsToRequest(): Collection<Int> {
+    val permissions = mutableListOf(getPermissionToRequest())
+    if (isRPlus()) {
+        permissions.add(PERMISSION_MEDIA_LOCATION)
+    }
+
+    if (isTiramisuPlus()) {
+        permissions.add(PERMISSION_READ_MEDIA_VIDEO)
+    }
+
+    return permissions
+}

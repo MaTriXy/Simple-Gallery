@@ -13,24 +13,25 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.DisplayMetrics
 import android.view.*
+import android.widget.RelativeLayout
 import android.widget.SeekBar
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory
-import com.google.android.exoplayer2.source.ExtractorMediaSource
-import com.google.android.exoplayer2.source.TrackGroupArray
-import com.google.android.exoplayer2.trackselection.TrackSelectionArray
-import com.google.android.exoplayer2.upstream.ContentDataSource
-import com.google.android.exoplayer2.upstream.DataSource
-import com.google.android.exoplayer2.upstream.DataSpec
-import com.google.android.exoplayer2.video.VideoListener
+import androidx.media3.common.*
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.ContentDataSource
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.simplemobiletools.commons.extensions.*
-import com.simplemobiletools.commons.helpers.ensureBackgroundThread
 import com.simplemobiletools.gallery.pro.R
+import com.simplemobiletools.gallery.pro.databinding.ActivityVideoPlayerBinding
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
-import kotlinx.android.synthetic.main.activity_video_player.*
-import kotlinx.android.synthetic.main.bottom_video_time_holder.*
 
+@UnstableApi
 open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListener, TextureView.SurfaceTextureListener {
     private val PLAY_WHEN_READY_DRAG_DELAY = 100L
 
@@ -50,16 +51,20 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     private var mCloseDownThreshold = 100f
 
     private var mUri: Uri? = null
-    private var mExoPlayer: SimpleExoPlayer? = null
+    private var mExoPlayer: ExoPlayer? = null
     private var mVideoSize = Point(0, 0)
     private var mTimerHandler = Handler()
     private var mPlayWhenReadyHandler = Handler()
 
     private var mIgnoreCloseDown = false
 
+    private val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
+
     public override fun onCreate(savedInstanceState: Bundle?) {
+        showTransparentTop = true
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_video_player)
+        setContentView(binding.root)
+        setupOptionsMenu()
         setupOrientation()
         checkNotchSupport()
         initPlayer()
@@ -67,12 +72,11 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
 
     override fun onResume() {
         super.onResume()
-        top_shadow.layoutParams.height = statusBarHeight + actionBarHeight
-        supportActionBar?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        binding.topShadow.layoutParams.height = statusBarHeight + actionBarHeight
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
         if (config.blackBackground) {
-            video_player_holder.background = ColorDrawable(Color.BLACK)
+            binding.videoPlayerHolder.background = ColorDrawable(Color.BLACK)
         }
 
         if (config.maxBrightness) {
@@ -81,7 +85,13 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
             window.attributes = attributes
         }
 
-        updateTextColors(video_player_holder)
+        updateTextColors(binding.videoPlayerHolder)
+
+        if (!portrait && navigationBarOnSide && navigationBarWidth > 0) {
+            binding.videoToolbar.setPadding(0, 0, navigationBarWidth, 0)
+        } else {
+            binding.videoToolbar.setPadding(0, 0, 0, 0)
+        }
     }
 
     override fun onPause() {
@@ -97,35 +107,52 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
         super.onDestroy()
         if (!isChangingConfigurations) {
             pauseVideo()
-            video_curr_time.text = 0.getFormattedDuration()
+            binding.bottomVideoTimeHolder.videoCurrTime.text = 0.getFormattedDuration()
             releaseExoPlayer()
-            video_seekbar.progress = 0
+            binding.bottomVideoTimeHolder.videoSeekbar.progress = 0
             mTimerHandler.removeCallbacksAndMessages(null)
             mPlayWhenReadyHandler.removeCallbacksAndMessages(null)
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_video_player, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.menu_change_orientation -> changeOrientation()
-            R.id.menu_open_with -> openPath(mUri!!.toString(), true)
-            R.id.menu_share -> shareMediumPath(mUri!!.toString())
-            else -> return super.onOptionsItemSelected(item)
+    private fun setupOptionsMenu() {
+        (binding.videoAppbar.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight
+        binding.videoToolbar.apply {
+            setTitleTextColor(Color.WHITE)
+            overflowIcon = resources.getColoredDrawableWithColor(com.simplemobiletools.commons.R.drawable.ic_three_dots_vector, Color.WHITE)
+            navigationIcon = resources.getColoredDrawableWithColor(com.simplemobiletools.commons.R.drawable.ic_arrow_left_vector, Color.WHITE)
         }
-        return true
+
+        updateMenuItemColors(binding.videoToolbar.menu, forceWhiteIcons = true)
+        binding.videoToolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_change_orientation -> changeOrientation()
+                R.id.menu_open_with -> openPath(mUri!!.toString(), true)
+                R.id.menu_share -> shareMediumPath(mUri!!.toString())
+                else -> return@setOnMenuItemClickListener false
+            }
+            return@setOnMenuItemClickListener true
+        }
+
+        binding.videoToolbar.setNavigationOnClickListener {
+            finish()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         setVideoSize()
         initTimeHolder()
-        video_surface_frame.onGlobalLayout {
-            video_surface_frame.controller.resetState()
+        binding.videoSurfaceFrame.onGlobalLayout {
+            binding.videoSurfaceFrame.controller.resetState()
+        }
+
+        binding.topShadow.layoutParams.height = statusBarHeight + actionBarHeight
+        (binding.videoAppbar.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight
+        if (!portrait && navigationBarOnSide && navigationBarWidth > 0) {
+            binding.videoToolbar.setPadding(0, 0, navigationBarWidth, 0)
+        } else {
+            binding.videoToolbar.setPadding(0, 0, 0, 0)
         }
     }
 
@@ -141,7 +168,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
 
     private fun initPlayer() {
         mUri = intent.data ?: return
-        supportActionBar?.title = getFilenameFromUri(mUri!!)
+        binding.videoToolbar.title = getFilenameFromUri(mUri!!)
         initTimeHolder()
 
         showSystemUI(true)
@@ -150,53 +177,49 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
             fullscreenToggled(isFullscreen)
         }
 
-        video_curr_time.setOnClickListener { doSkip(false) }
-        video_duration.setOnClickListener { doSkip(true) }
-        video_toggle_play_pause.setOnClickListener { togglePlayPause() }
-        video_surface_frame.setOnClickListener { toggleFullscreen() }
-        video_surface_frame.controller.settings.swallowDoubleTaps = true
+        binding.bottomVideoTimeHolder.videoCurrTime.setOnClickListener { doSkip(false) }
+        binding.bottomVideoTimeHolder.videoDuration.setOnClickListener { doSkip(true) }
+        binding.bottomVideoTimeHolder.videoTogglePlayPause.setOnClickListener { togglePlayPause() }
+        binding.videoSurfaceFrame.setOnClickListener { toggleFullscreen() }
+        binding.videoSurfaceFrame.controller.settings.swallowDoubleTaps = true
 
-        video_next_file.beVisibleIf(intent.getBooleanExtra(SHOW_NEXT_ITEM, false))
-        video_next_file.setOnClickListener { handleNextFile() }
+        binding.bottomVideoTimeHolder.videoNextFile.beVisibleIf(intent.getBooleanExtra(SHOW_NEXT_ITEM, false))
+        binding.bottomVideoTimeHolder.videoNextFile.setOnClickListener { handleNextFile() }
 
-        video_prev_file.beVisibleIf(intent.getBooleanExtra(SHOW_PREV_ITEM, false))
-        video_prev_file.setOnClickListener { handlePrevFile() }
-
+        binding.bottomVideoTimeHolder.videoPrevFile.beVisibleIf(intent.getBooleanExtra(SHOW_PREV_ITEM, false))
+        binding.bottomVideoTimeHolder.videoPrevFile.setOnClickListener { handlePrevFile() }
 
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent?): Boolean {
-                if (e != null) {
-                    handleDoubleTap(e.rawX)
-                }
-
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                handleDoubleTap(e.rawX)
                 return true
             }
         })
 
-        video_surface_frame.setOnTouchListener { view, event ->
+        binding.videoSurfaceFrame.setOnTouchListener { view, event ->
             handleEvent(event)
             gestureDetector.onTouchEvent(event)
             false
         }
 
         initExoPlayer()
-        video_surface.surfaceTextureListener = this
+        binding.videoSurface.surfaceTextureListener = this
 
         if (config.allowVideoGestures) {
-            video_brightness_controller.initialize(this, slide_info, true, video_player_holder, singleTap = { x, y ->
+            binding.videoBrightnessController.initialize(this, binding.slideInfo, true, binding.videoPlayerHolder, singleTap = { x, y ->
                 toggleFullscreen()
             }, doubleTap = { x, y ->
                 doSkip(false)
             })
 
-            video_volume_controller.initialize(this, slide_info, false, video_player_holder, singleTap = { x, y ->
+            binding.videoVolumeController.initialize(this, binding.slideInfo, false, binding.videoPlayerHolder, singleTap = { x, y ->
                 toggleFullscreen()
             }, doubleTap = { x, y ->
                 doSkip(true)
             })
         } else {
-            video_brightness_controller.beGone()
-            video_volume_controller.beGone()
+            binding.videoBrightnessController.beGone()
+            binding.videoVolumeController.beGone()
         }
 
         if (config.hideSystemUI) {
@@ -209,7 +232,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     }
 
     private fun initExoPlayer() {
-        val dataSpec = DataSpec(mUri)
+        val dataSpec = DataSpec(mUri!!)
         val fileDataSource = ContentDataSource(applicationContext)
         try {
             fileDataSource.open(dataSpec)
@@ -218,69 +241,60 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
         }
 
         val factory = DataSource.Factory { fileDataSource }
-        val audioSource = ExtractorMediaSource(fileDataSource.uri, factory, DefaultExtractorsFactory(), null, null)
-        mExoPlayer = ExoPlayerFactory.newSimpleInstance(applicationContext).apply {
-            seekParameters = SeekParameters.CLOSEST_SYNC
-            audioStreamType = C.STREAM_TYPE_MUSIC
-            if (config.loopVideos) {
-                repeatMode = Player.REPEAT_MODE_ONE
+        val mediaSource: MediaSource = ProgressiveMediaSource.Factory(factory)
+            .createMediaSource(MediaItem.fromUri(fileDataSource.uri!!))
+
+        mExoPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(applicationContext))
+            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .build()
+            .apply {
+                setMediaSource(mediaSource)
+                setAudioAttributes(
+                    AudioAttributes
+                        .Builder()
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(), false
+                )
+                if (config.loopVideos) {
+                    repeatMode = Player.REPEAT_MODE_ONE
+                }
+                prepare()
+                initListeners()
             }
-            prepare(audioSource)
-        }
-        initExoPlayerListeners()
     }
 
-    private fun initExoPlayerListeners() {
-        mExoPlayer!!.addListener(object : Player.EventListener {
-            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters?) {}
-
-            override fun onSeekProcessed() {}
-
-            override fun onTracksChanged(trackGroups: TrackGroupArray?, trackSelections: TrackSelectionArray?) {}
-
-            override fun onPlayerError(error: ExoPlaybackException?) {}
-
-            override fun onLoadingChanged(isLoading: Boolean) {}
-
-            override fun onPositionDiscontinuity(reason: Int) {
+    private fun ExoPlayer.initListeners() {
+        addListener(object : Player.Listener {
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, @Player.DiscontinuityReason reason: Int) {
                 // Reset progress views when video loops.
-                if (reason == Player.DISCONTINUITY_REASON_PERIOD_TRANSITION) {
-                    video_seekbar.progress = 0
-                    video_curr_time.text = 0.getFormattedDuration()
+                if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    binding.bottomVideoTimeHolder.videoSeekbar.progress = 0
+                    binding.bottomVideoTimeHolder.videoCurrTime.text = 0.getFormattedDuration()
                 }
             }
 
-            override fun onRepeatModeChanged(repeatMode: Int) {}
-
-            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {}
-
-            override fun onTimelineChanged(timeline: Timeline?, manifest: Any?, reason: Int) {}
-
-            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+            override fun onPlaybackStateChanged(@Player.State playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> videoPrepared()
                     Player.STATE_ENDED -> videoCompleted()
                 }
             }
-        })
 
-        mExoPlayer!!.addVideoListener(object : VideoListener {
-            override fun onVideoSizeChanged(width: Int, height: Int, unappliedRotationDegrees: Int, pixelWidthHeightRatio: Float) {
-                mVideoSize.x = width
-                mVideoSize.y = height
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                mVideoSize.x = videoSize.width
+                mVideoSize.y = videoSize.height
                 setVideoSize()
             }
-
-            override fun onRenderedFirstFrame() {}
         })
     }
 
     private fun videoPrepared() {
         if (!mWasVideoStarted) {
-            video_toggle_play_pause.beVisible()
+            binding.bottomVideoTimeHolder.videoTogglePlayPause.beVisible()
             mDuration = (mExoPlayer!!.duration / 1000).toInt()
-            video_seekbar.max = mDuration
-            video_duration.text = mDuration.getFormattedDuration()
+            binding.bottomVideoTimeHolder.videoSeekbar.max = mDuration
+            binding.bottomVideoTimeHolder.videoDuration.text = mDuration.getFormattedDuration()
             setPosition(mCurrTime)
 
             if (config.rememberLastVideoPosition) {
@@ -290,7 +304,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
             if (config.autoplayVideos) {
                 resumeVideo()
             } else {
-                video_toggle_play_pause.setImageResource(R.drawable.ic_play_outline)
+                binding.bottomVideoTimeHolder.videoTogglePlayPause.setImageResource(com.simplemobiletools.commons.R.drawable.ic_play_outline_vector)
             }
         }
     }
@@ -305,7 +319,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     }
 
     private fun resumeVideo() {
-        video_toggle_play_pause.setImageResource(R.drawable.ic_pause_outline)
+        binding.bottomVideoTimeHolder.videoTogglePlayPause.setImageResource(com.simplemobiletools.commons.R.drawable.ic_pause_outline_vector)
         if (mExoPlayer == null) {
             return
         }
@@ -322,7 +336,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     }
 
     private fun pauseVideo() {
-        video_toggle_play_pause.setImageResource(R.drawable.ic_play_outline)
+        binding.bottomVideoTimeHolder.videoTogglePlayPause.setImageResource(com.simplemobiletools.commons.R.drawable.ic_play_outline_vector)
         if (mExoPlayer == null) {
             return
         }
@@ -346,8 +360,8 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
 
     private fun setPosition(seconds: Int) {
         mExoPlayer?.seekTo(seconds * 1000L)
-        video_seekbar.progress = seconds
-        video_curr_time.text = seconds.getFormattedDuration()
+        binding.bottomVideoTimeHolder.videoSeekbar.progress = seconds
+        binding.bottomVideoTimeHolder.videoCurrTime.text = seconds.getFormattedDuration()
     }
 
     private fun setLastVideoSavedPosition() {
@@ -364,8 +378,8 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
 
         clearLastVideoSavedProgress()
         mCurrTime = (mExoPlayer!!.duration / 1000).toInt()
-        video_seekbar.progress = video_seekbar.max
-        video_curr_time.text = mDuration.getFormattedDuration()
+        binding.bottomVideoTimeHolder.videoSeekbar.progress = binding.bottomVideoTimeHolder.videoSeekbar.max
+        binding.bottomVideoTimeHolder.videoCurrTime.text = mDuration.getFormattedDuration()
         pauseVideo()
     }
 
@@ -398,7 +412,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
 
         val screenProportion = screenWidth.toFloat() / screenHeight.toFloat()
 
-        video_surface.layoutParams.apply {
+        binding.videoSurface.layoutParams.apply {
             if (videoProportion > screenProportion) {
                 width = screenWidth
                 height = (screenWidth.toFloat() / videoProportion).toInt()
@@ -406,7 +420,7 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
                 width = (videoProportion * screenHeight.toFloat()).toInt()
                 height = screenHeight
             }
-            video_surface.layoutParams = this
+            binding.videoSurface.layoutParams = this
         }
 
         val multiplier = if (screenWidth > screenHeight) 0.5 else 0.8
@@ -443,13 +457,33 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
         }
 
         val newAlpha = if (isFullScreen) 0f else 1f
-        arrayOf(video_prev_file, video_toggle_play_pause, video_next_file, video_curr_time, video_seekbar, video_duration, top_shadow, video_bottom_gradient).forEach {
+        arrayOf(
+            binding.bottomVideoTimeHolder.videoPrevFile,
+            binding.bottomVideoTimeHolder.videoTogglePlayPause,
+            binding.bottomVideoTimeHolder.videoNextFile,
+            binding.bottomVideoTimeHolder.videoCurrTime,
+            binding.bottomVideoTimeHolder.videoSeekbar,
+            binding.bottomVideoTimeHolder.videoDuration,
+            binding.topShadow,
+            binding.videoBottomGradient
+        ).forEach {
             it.animate().alpha(newAlpha).start()
         }
-        video_seekbar.setOnSeekBarChangeListener(if (mIsFullscreen) null else this)
-        arrayOf(video_prev_file, video_next_file, video_curr_time, video_duration).forEach {
+        binding.bottomVideoTimeHolder.videoSeekbar.setOnSeekBarChangeListener(if (mIsFullscreen) null else this)
+        arrayOf(
+            binding.bottomVideoTimeHolder.videoPrevFile,
+            binding.bottomVideoTimeHolder.videoNextFile,
+            binding.bottomVideoTimeHolder.videoCurrTime,
+            binding.bottomVideoTimeHolder.videoDuration,
+        ).forEach {
             it.isClickable = !mIsFullscreen
         }
+
+        binding.videoAppbar.animate().alpha(newAlpha).withStartAction {
+            binding.videoAppbar.beVisible()
+        }.withEndAction {
+            binding.videoAppbar.beVisibleIf(newAlpha == 1f)
+        }.start()
     }
 
     private fun initTimeHolder() {
@@ -465,11 +499,11 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
             }
         }
 
-        video_time_holder.setPadding(0, 0, right, bottom)
-        video_seekbar.setOnSeekBarChangeListener(this)
-        video_seekbar.max = mDuration
-        video_duration.text = mDuration.getFormattedDuration()
-        video_curr_time.text = mCurrTime.getFormattedDuration()
+        binding.bottomVideoTimeHolder.videoTimeHolder.setPadding(0, 0, right, bottom)
+        binding.bottomVideoTimeHolder.videoSeekbar.setOnSeekBarChangeListener(this)
+        binding.bottomVideoTimeHolder.videoSeekbar.max = mDuration
+        binding.bottomVideoTimeHolder.videoDuration.text = mDuration.getFormattedDuration()
+        binding.bottomVideoTimeHolder.videoCurrTime.text = mCurrTime.getFormattedDuration()
         setupTimer()
     }
 
@@ -478,8 +512,8 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
             override fun run() {
                 if (mExoPlayer != null && !mIsDragged && mIsPlaying) {
                     mCurrTime = (mExoPlayer!!.currentPosition / 1000).toInt()
-                    video_seekbar.progress = mCurrTime
-                    video_curr_time.text = mCurrTime.getFormattedDuration()
+                    binding.bottomVideoTimeHolder.videoSeekbar.progress = mCurrTime
+                    binding.bottomVideoTimeHolder.videoCurrTime.text = mCurrTime.getFormattedDuration()
                 }
 
                 mTimerHandler.postDelayed(this, 1000)
@@ -505,19 +539,24 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     private fun handleEvent(event: MotionEvent) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                mTouchDownX = event.x
-                mTouchDownY = event.y
+                mTouchDownX = event.rawX
+                mTouchDownY = event.rawY
                 mTouchDownTime = System.currentTimeMillis()
                 mProgressAtDown = mExoPlayer!!.currentPosition
             }
+
             MotionEvent.ACTION_POINTER_DOWN -> mIgnoreCloseDown = true
             MotionEvent.ACTION_MOVE -> {
-                val diffX = event.x - mTouchDownX
-                val diffY = event.y - mTouchDownY
+                val diffX = event.rawX - mTouchDownX
+                val diffY = event.rawY - mTouchDownY
 
-                if (mIsDragged || (Math.abs(diffX) > mDragThreshold && Math.abs(diffX) > Math.abs(diffY)) && video_surface_frame.controller.state.zoom == 1f) {
+                if (mIsDragged || (Math.abs(diffX) > mDragThreshold && Math.abs(diffX) > Math.abs(diffY)) && binding.videoSurfaceFrame.controller.state.zoom == 1f) {
                     if (!mIsDragged) {
-                        arrayOf(video_curr_time, video_seekbar, video_duration).forEach {
+                        arrayOf(
+                            binding.bottomVideoTimeHolder.videoCurrTime,
+                            binding.bottomVideoTimeHolder.videoSeekbar,
+                            binding.bottomVideoTimeHolder.videoDuration,
+                        ).forEach {
                             it.animate().alpha(1f).start()
                         }
                     }
@@ -534,21 +573,27 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
                     resetPlayWhenReady()
                 }
             }
+
             MotionEvent.ACTION_UP -> {
-                val diffX = mTouchDownX - event.x
-                val diffY = mTouchDownY - event.y
+                val diffX = mTouchDownX - event.rawX
+                val diffY = mTouchDownY - event.rawY
 
                 val downGestureDuration = System.currentTimeMillis() - mTouchDownTime
                 if (config.allowDownGesture && !mIgnoreCloseDown && Math.abs(diffY) > Math.abs(diffX) && diffY < -mCloseDownThreshold &&
-                        downGestureDuration < MAX_CLOSE_DOWN_GESTURE_DURATION &&
-                        video_surface_frame.controller.state.zoom == 1f) {
+                    downGestureDuration < MAX_CLOSE_DOWN_GESTURE_DURATION &&
+                    binding.videoSurfaceFrame.controller.state.zoom == 1f
+                ) {
                     supportFinishAfterTransition()
                 }
 
                 mIgnoreCloseDown = false
                 if (mIsDragged) {
                     if (mIsFullscreen) {
-                        arrayOf(video_curr_time, video_seekbar, video_duration).forEach {
+                        arrayOf(
+                            binding.bottomVideoTimeHolder.videoCurrTime,
+                            binding.bottomVideoTimeHolder.videoSeekbar,
+                            binding.bottomVideoTimeHolder.videoDuration,
+                        ).forEach {
                             it.animate().alpha(0f).start()
                         }
                     }
@@ -587,11 +632,11 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
     }
 
     private fun releaseExoPlayer() {
-        mExoPlayer?.stop()
-        ensureBackgroundThread {
-            mExoPlayer?.release()
-            mExoPlayer = null
+        mExoPlayer?.apply {
+            stop()
+            release()
         }
+        mExoPlayer = null
     }
 
     override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -618,16 +663,13 @@ open class VideoPlayerActivity : SimpleActivity(), SeekBar.OnSeekBarChangeListen
         mIsDragged = false
     }
 
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture?) {
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture) = false
+
+    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+        mExoPlayer?.setVideoSurface(Surface(binding.videoSurface.surfaceTexture))
     }
 
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture?) = false
-
-    override fun onSurfaceTextureAvailable(surface: SurfaceTexture?, width: Int, height: Int) {
-        ensureBackgroundThread {
-            mExoPlayer?.setVideoSurface(Surface(video_surface!!.surfaceTexture))
-        }
-    }
-
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture?, width: Int, height: Int) {}
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
 }

@@ -1,10 +1,10 @@
 package com.simplemobiletools.gallery.pro.fragments
 
-import android.media.ExifInterface
 import android.provider.MediaStore
 import android.provider.MediaStore.Files
 import android.provider.MediaStore.Images
 import android.view.MotionEvent
+import androidx.exifinterface.media.ExifInterface
 import androidx.fragment.app.Fragment
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.gallery.pro.extensions.config
@@ -135,17 +135,19 @@ abstract class ViewPagerFragment : Fragment() {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 mTouchDownTime = System.currentTimeMillis()
-                mTouchDownX = event.x
-                mTouchDownY = event.y
+                mTouchDownX = event.rawX
+                mTouchDownY = event.rawY
             }
+
             MotionEvent.ACTION_POINTER_DOWN -> mIgnoreCloseDown = true
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                val diffX = mTouchDownX - event.x
-                val diffY = mTouchDownY - event.y
+                val diffX = mTouchDownX - event.rawX
+                val diffY = mTouchDownY - event.rawY
 
                 val downGestureDuration = System.currentTimeMillis() - mTouchDownTime
-                if (!mIgnoreCloseDown && Math.abs(diffY) > Math.abs(diffX) && diffY < -mCloseDownThreshold && downGestureDuration < MAX_CLOSE_DOWN_GESTURE_DURATION && context?.config?.allowDownGesture == true) {
-                    activity?.supportFinishAfterTransition()
+                if (!mIgnoreCloseDown && (Math.abs(diffY) > Math.abs(diffX)) && (diffY < -mCloseDownThreshold) && downGestureDuration < MAX_CLOSE_DOWN_GESTURE_DURATION && context?.config?.allowDownGesture == true) {
+                    activity?.finish()
+                    activity?.overridePendingTransition(0, com.simplemobiletools.commons.R.anim.slide_down)
                 }
                 mIgnoreCloseDown = false
             }

@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.simplemobiletools.gallery.pro.interfaces.*
 import com.simplemobiletools.gallery.pro.models.*
 
-@Database(entities = [Directory::class, Medium::class, Widget::class, DateTaken::class, Favorite::class], version = 8)
+@Database(entities = [Directory::class, Medium::class, Widget::class, DateTaken::class, Favorite::class], version = 10)
 abstract class GalleryDatabase : RoomDatabase() {
 
     abstract fun DirectoryDao(): DirectoryDao
@@ -30,12 +30,14 @@ abstract class GalleryDatabase : RoomDatabase() {
                 synchronized(GalleryDatabase::class) {
                     if (db == null) {
                         db = Room.databaseBuilder(context.applicationContext, GalleryDatabase::class.java, "gallery.db")
-                                .fallbackToDestructiveMigration()
-                                .addMigrations(MIGRATION_4_5)
-                                .addMigrations(MIGRATION_5_6)
-                                .addMigrations(MIGRATION_6_7)
-                                .addMigrations(MIGRATION_7_8)
-                                .build()
+                            .fallbackToDestructiveMigration()
+                            .addMigrations(MIGRATION_4_5)
+                            .addMigrations(MIGRATION_5_6)
+                            .addMigrations(MIGRATION_6_7)
+                            .addMigrations(MIGRATION_7_8)
+                            .addMigrations(MIGRATION_8_9)
+                            .addMigrations(MIGRATION_9_10)
+                            .build()
                     }
                 }
             }
@@ -43,6 +45,9 @@ abstract class GalleryDatabase : RoomDatabase() {
         }
 
         fun destroyInstance() {
+            if (db?.isOpen == true) {
+                db?.close()
+            }
             db = null
         }
 
@@ -72,6 +77,18 @@ abstract class GalleryDatabase : RoomDatabase() {
         private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE directories ADD COLUMN sort_value TEXT default '' NOT NULL")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE date_takens ADD COLUMN last_modified INTEGER default 0 NOT NULL")
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE media ADD COLUMN media_store_id INTEGER default 0 NOT NULL")
             }
         }
     }

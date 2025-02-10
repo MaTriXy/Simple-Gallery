@@ -1,6 +1,611 @@
 Changelog
 ==========
 
+Version 6.28.1 *(2023-10-09)*
+----------------------------
+
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.28.0 *(2023-09-28)*
+----------------------------
+
+ * Animate GIFs and WebP files at folders too, if set so
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.27.2 *(2023-07-31)*
+----------------------------
+
+ * Updated the photo/video editor SDK
+ * Reverted some subfolder grouping related changes
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.27.1 *(2023-07-26)*
+----------------------------
+
+ * Improved video playback
+ * Fixed some subfolder grouping related issues
+ * Do not allow copying locked folders content without unlocking
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.27.0 *(2023-07-05)*
+----------------------------
+
+ * Fixed image resizing with renaming
+ * Added search at the destination picker dialog
+ * Remember the last used folder at copying
+ * Allow skipping the recycle bin at deleting
+ * Updated some libraries
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.10 *(2023-06-12)*
+----------------------------
+
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.9 *(2023-06-09)*
+----------------------------
+
+ * Allow resizing multiple images at once
+ * Try harder at keeping last modified values at some file operations
+ * Allow changing the apps language on Android 13+
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.8 *(2023-04-26)*
+----------------------------
+
+ * Try displaying some WhatsApp folders by default
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.7 *(2023-04-11)*
+----------------------------
+
+ * Updated the advanced photo and video editor
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.6 *(2023-03-22)*
+----------------------------
+
+ * Fixed deleting files from hidden folders
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.5 *(2023-03-07)*
+----------------------------
+
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.4 *(2023-02-27)*
+----------------------------
+
+ * Allow merging videos in the Advanced Editor
+ * Show a welcome screen at upgrading from the free version
+ * Added some translation, stability, UX and UI improvements
+
+Version 6.26.3 *(2023-01-23)*
+----------------------------
+
+ * Added an Open Recycle Bin menu item for quick access, if it isnt shown as folder
+ * Show Manage Included Folders even without proper permissions
+ * Added some translation, stability and UX improvements
+
+Version 6.26.2 *(2023-01-20)*
+----------------------------
+
+ * Allow exporting and importing favorite file paths
+ * Fixed an image gesture rotation glitch
+ * Added many translation, stability, UX and UI improvements
+
+Version 6.26.1 *(2023-01-12)*
+----------------------------
+
+ * Added some Search related fixes on lower OS versions
+
+Version 6.26.0 *(2023-01-11)*
+----------------------------
+
+ * Use Material You design by default on Android 12+
+ * Increased minimal required Android OS version to 6
+ * Allow choosing between the basic and advanced photo editor
+ * Added a menu button for quick toggle between Folders and All Files views
+ * Added a setting for always searching all device files from the main screen
+ * Allow showing excluded folders at the destination picker too
+ * Added many translation, stability, UX and UI improvements
+
+Version 6.25.5 *(2022-11-22)*
+----------------------------
+
+ * Always show the hidden item display button, just require All Files for it
+ * Added some translation, stability and UX improvements
+
+Version 6.25.4 *(2022-10-17)*
+----------------------------
+
+ * Restored the All Files permission, mostly related to hidden files
+ * Added some translation, stability and UX improvements
+
+Version 6.25.3 *(2022-10-14)*
+----------------------------
+
+ * Restored the All Files permission, mostly related to hidden files
+ * Added some translation, stability and UX improvements
+
+Version 6.25.1 *(2022-10-03)*
+----------------------------
+
+ * Updated the photo/video editor
+ * Adding a Get Simple Phone button into the About section
+ * Added some translation and UX improvements
+
+Version 6.25.0 *(2022-09-03)*
+----------------------------
+
+ * Added Monochrome icon and Language picker support on Android 13+
+ * Added some translation and UX improvements
+
+Version 6.24.1 *(2022-08-01)*
+----------------------------
+
+ * Fixed the top Menu at All files search
+
+Version 6.24.0 *(2022-07-30)*
+----------------------------
+
+ * Fixed a glitch with video editor saving corrupt files
+ * Adding some materialish elements, especially in System default theme
+ * Added some stability, translation and UX improvements
+
+Version 6.23.13 *(2022-07-06)*
+----------------------------
+
+ * Fixed swiping fullscreen media from videos
+ * Added some stability, translation and UX improvements
+
+Version 6.23.12 *(2022-06-23)*
+----------------------------
+
+ * Fixed some renaming and moving issues
+ * Allow using custom aspect ratio at wallpaper setter
+ * Fix a glitch with wrong file being shown at fullscreen view
+ * Added some stability, translation and UX improvements
+
+Version 6.23.11 *(2022-06-07)*
+----------------------------
+
+ * Fixed a crash at third party intent file picker
+
+Version 6.23.10 *(2022-06-06)*
+----------------------------
+
+ * Allow temporarily showing excluded folders on Android 11+, if hiding is unavailable
+ * Fixed the Indonesian translation
+ * Fixed the performance of copy/move onto SD cards
+ * Added some translation and stability improvements
+
+Version 6.23.9 *(2022-06-01)*
+----------------------------
+
+ * Fixed some sorting by Date Taken related issues
+ * Fixed some file operation related glitches
+ * Added some stability, translation and UX improvements
+
+Version 6.23.8 *(2022-05-25)*
+----------------------------
+
+ * Allow creating new folders from the main screen too
+ * Fixed some file operation related issues
+ * Show the size of items that are going to be deleted at confirmation
+ * Reverted the photo/video editor to fix video editing
+ * Fixed Indonesian translation
+ * Added some translation and stability improvements
+
+Version 6.23.7 *(2022-05-16)*
+----------------------------
+
+ * Fixed a glitch with deleting files from fullscreen view
+ * Added some stability and translation improvements
+
+Version 6.23.6 *(2022-05-14)*
+----------------------------
+
+ * Fixed a glitch with device freezing at deleting multiple files at once
+ * Properly handle deleting the last file in a folder
+ * Restore previous way of handling hidden and included folders in FOSS app version, not Google Play
+ * Added some stability, translation and UX improvements
+
+Version 6.23.5 *(2022-05-05)*
+----------------------------
+
+ * Fixed renaming SD card files on Android 12
+
+Version 6.23.4 *(2022-05-04)*
+----------------------------
+
+ * Fixed a copying related glitch on Android 12
+ * Added some stability and translation improvements
+
+Version 6.23.3 *(2022-05-03)*
+----------------------------
+
+ * Show proper Last Modified value after file moving
+ * Fix some wallpaper setting related glitches
+ * Make sure Fix Date Taken values works on Android 11+
+ * Added some stability and translation improvements
+
+Version 6.23.2 *(2022-05-01)*
+----------------------------
+
+ * Simplify some file operations on Android 12+, if the gallery is set as a Media Management app
+ * Added .avif support on Android 12
+ * Allow setting both landscape and portrait wallpapers
+ * Added some translation, stability and UX improvements
+
+Version 6.23.1 *(2022-04-16)*
+----------------------------
+
+ * Fixed some file operations on Android 10 and 11
+ * Restore Recycle bin files in Pictures, if the original folder is inaccessible
+
+Version 6.23.0 *(2022-04-15)*
+----------------------------
+
+ * Mark favorited file thumbnails
+ * Added an Auto and Material You theme on Android 12+
+ * Changed some file operations to comply with the latest Google permissions policy, apps like this can no longer show hidden items on Android 11+
+ * Properly delete items in the recycle bin after 30 days
+ * Added many other stability, translation, performance, UX and UI improvements
+
+Version 6.22.3 *(2021-12-19)*
+----------------------------
+
+ * Fixed some file operation related glitches
+ * Fixed sorting by date taken in some cases
+ * Allow showing file count at section headers, at using Group by at thumbnails
+ * Some stability, translation and UX improvements
+ * This version won't be on Google Play
+
+Version 6.22.2 *(2021-12-05)*
+----------------------------
+
+ * Improved the performance of file fetching
+ * Some stability, translation and UX improvements
+ * This version won't be on Google Play
+
+Version 6.22.1 *(2021-12-02)*
+----------------------------
+
+ * Redesigned some screens and views, added an Auto theme
+ * Mark favorited item thumbnails
+ * Fixed some file operations on Android 11+
+ * Couple other stability, translation and UX improvements
+ * This version won't be on Google Play
+
+Version 6.22.0 *(2021-10-26)*
+----------------------------
+
+ * Added a Contributors section
+ * Fixed a bug with folders not being sorted properly in some cases
+ * Refresh Favorites and Recycle bin with higher priority than the rest
+ * Added 20:9 crop ratio at the image editor
+ * Some other stability, UX and translation improvements
+
+Version 6.21.7 *(2021-10-19)*
+----------------------------
+
+ * Fixed a glitch with videos being corrupt after editing
+ * Some stability and translation improvements
+
+Version 6.21.6 *(2021-10-10)*
+----------------------------
+
+ * Reverting to the previous way of file deletion
+ * Added some stability and translation improvements
+
+Version 6.21.5 *(2021-10-10)*
+----------------------------
+
+ * Reverting to the previous way of file deletion
+ * Added some stability and translation improvements
+
+Version 6.21.4 *(2021-10-09)*
+----------------------------
+
+ * Fixed some file operations on Android 11+
+ * Fixed files not being recognized by some apps after edit/copy
+ * Added some stability, translation and UX improvements
+
+Version 6.21.3 *(2021-10-03)*
+----------------------------
+
+ * Fixed a glitch with edited videos being low quality
+ * Added some UX, translation and stability improvements
+
+Version 6.21.2 *(2021-09-09)*
+----------------------------
+
+ * Fixed a crash related to fixing date taken values
+
+Version 6.21.1 *(2021-09-07)*
+----------------------------
+
+ * Fixed some glitches related to third party intent handling
+ * Avoid rescanning paths in some cases to prevent file corruption
+ * Fixed a glitch with Rotate bottom button being always visible at fullscreen view
+ * Couple other stability, UX and translation improvements
+
+Version 6.21.0 *(2021-08-18)*
+----------------------------
+
+ * Add support for APNG files
+ * Fixed some crashes at zooming HEIC files
+ * Do not allow clicking bottom buttons at fullscreen mode
+
+Version 6.20.3 *(2021-06-28)*
+----------------------------
+
+ * Disable fullscreen image rotation during a zooming gesture
+ * Fixed a glitch with fullscreen bottom action buttons being misplaced
+ * Allow long pressing the bottom actions for a tooltip
+ * Added some stability and translation improvements
+
+Version 6.20.2 *(2021-06-18)*
+----------------------------
+
+ * Fixed a glitch with some PNG thumbnails not showing up well
+ * Fixed an issue with edited exported videos being too low resolution
+ * Adding some stability and translation improvements
+
+Version 6.20.1 *(2021-05-14)*
+----------------------------
+
+ * Adding a crashfix
+
+Version 6.20.0 *(2021-05-14)*
+----------------------------
+
+ * Allow ordering folders in a custom order by Drag & Drop
+ * Properly show the recycle bin files size in all cases
+ * Show at least 3 items at the main screens top menu
+ * Fixed some split screen related glitches
+ * Updated the photo/video editor, videos can now be paused easier
+ * Added some stability and translation improvements
+
+Version 6.19.6 *(2021-04-18)*
+----------------------------
+
+ * Fixed some photo editor related glitches
+ * Some smaller bugfixes, translation and stability improvements
+
+Version 6.19.5 *(2021-03-31)*
+----------------------------
+
+ * Changed the default file loading priority to Speed
+ * Apply the max brightness option to panoramas too
+ * Some smaller stability and translation improvements
+
+Version 6.19.4 *(2021-03-09)*
+----------------------------
+
+ * Adding some crashfixes
+
+Version 6.19.3 *(2021-03-08)*
+----------------------------
+
+ * Added some design, stability, translation and performance improvements
+
+Version 6.19.2 *(2021-02-19)*
+----------------------------
+
+ * Fixed some Android 11 related glitches
+ * Added a White theme with special handling
+ * Many stability, translation and performance improvements
+
+Version 6.19.1 *(2021-01-26)*
+----------------------------
+
+ * Disable brightness setting with gestures at fullscreen view, allow toggling it
+ * Fix deleting files from the Camera, Downloads and Screenshots folder on some devices
+ * Some other translation and UX improvements
+
+Version 6.19.0 *(2021-01-21)*
+----------------------------
+
+ * Allow easily clearing the app cache from the app settings
+ * Allow customizing the spacing between file thumbnails, or using rounded corners
+ * Many other performance, UI, UX, translation and stability improvements
+
+Version 6.18.3 *(2021-01-14)*
+----------------------------
+
+ * Speed up fullscreen medium loading a bit too
+
+Version 6.18.2 *(2021-01-14)*
+----------------------------
+
+ * Improve the performance at scrolling media thumbnails
+ * Speed up cached folder fetching
+ * Some stability and translation improvements
+
+Version 6.18.1 *(2021-01-03)*
+----------------------------
+
+ * Updated the photo and video editor to fix some glitches
+ * Added some translation and stability improvements
+
+Version 6.18.0 *(2020-12-08)*
+----------------------------
+
+ * Added a Video Editor
+ * Added Stickers and Overlays to the Photo Editor
+ * Some translation, stability and UI improvements
+
+Version 6.17.3 *(2020-11-10)*
+----------------------------
+
+ * Properly update the folder thumbnail text colors
+
+Version 6.17.2 *(2020-11-09)*
+----------------------------
+
+ * Adding some folder thumbnail customization at the app settings
+ * Allow setting a default folder to be opened at app launch (by roland-kister)
+ * Updated the photo editor to fix some glitches
+
+Version 6.17.1 *(2020-11-03)*
+----------------------------
+
+ * Reverting to the previous UI of the main screen, but keep rounded corners at list view
+ * Some UI and stability improvements
+
+Version 6.17.0 *(2020-11-02)*
+----------------------------
+
+ * Redesigning the main folders screen, try making it moderner (!)
+ * Fix some glitches with deep zoomable fullscreen images not loading in well
+ * Couple other UX, stability and translation improvements
+
+Version 6.16.5 *(2020-10-28)*
+----------------------------
+
+ * Added some hidden folder handling related improvements
+ * Fixed saving files on the SD card after editing
+ * Couple other UX, translation and performance improvements
+
+Version 6.16.4 *(2020-10-24)*
+----------------------------
+
+ * Fixed an editor glitch occurring if the file path contained spaces
+ * Added some stability improvements
+
+Version 6.16.3 *(2020-10-16)*
+----------------------------
+
+ * Updated the photo editor to fix some issues, mostly related to Android 11
+ * Make sure file moving doesn't block the UI in any case
+
+Version 6.16.2 *(2020-10-10)*
+----------------------------
+
+ * Fix sorting by Date Taken
+ * Properly display some wrongly named WebP files
+
+Version 6.16.1 *(2020-09-27)*
+----------------------------
+
+ * Fixed a bug with some folders not being recognized
+ * Improved thumbnail loading performance in some cases
+
+Version 6.16.0 *(2020-09-25)*
+----------------------------
+
+ * Adding support for animated WebP files
+ * Fixed a permissions glitch after upgrading to Android 11
+ * Added many performance related improvements
+
+Version 6.15.6 *(2020-09-22)*
+----------------------------
+
+ * Fixed the file loading performance in some cases
+ * Fixed some photo editor related glitches
+ * Fixed the Use English language settings toggle
+
+Version 6.15.5 *(2020-09-16)*
+----------------------------
+
+ * Properly fetch the latest available Last Modified of files
+
+Version 6.15.4 *(2020-09-16)*
+----------------------------
+
+ * Improved file loading performance
+
+Version 6.15.3 *(2020-09-09)*
+----------------------------
+
+ * Improved file loading performance in some cases
+ * Some UX, translation and stability improvements
+
+Version 6.15.2 *(2020-06-17)*
+----------------------------
+
+ * Fixed a glitch at caching fullscreen images
+ * Properly recognize a new type of panoramic images
+
+Version 6.15.1 *(2020-06-12)*
+----------------------------
+
+ * Fixed a glitch at caching fullscreen images
+ * Improved batch renaming with patterns
+
+Version 6.15.0 *(2020-06-07)*
+----------------------------
+
+ * Rescan the internal storage from time to time, look for new folders containing media
+ * Improve the Search user experience, do not reset it at opening an item
+ * Fixed some editor glitches
+ * Speed up fullscreen image loading
+
+Version 6.14.10 *(2020-05-29)*
+----------------------------
+
+ * Updated the image editor, fix a glitch with black preview
+ * Show Portrait images by default on Android 10
+ * Use a nicer icon on older devices
+ * Some translation and stability improvements
+
+Version 6.14.9 *(2020-05-18)*
+----------------------------
+
+ * Fixing some glitches with hidden folders not being shown when appropriate
+ * Added some stability and translation improvements
+
+Version 6.14.8 *(2020-05-05)*
+----------------------------
+
+ * Added some crashfixes
+
+Version 6.14.7 *(2020-05-04)*
+----------------------------
+
+ * Fixed a glitch with some favorite items disappearing
+ * Improve folder hiding, add the new .nomedia file into MediaStore
+ * Improve the performance of getting video file duration
+ * A few other improvements here and there
+
+Version 6.14.6 *(2020-04-26)*
+----------------------------
+
+ * Added a few more stability and performance improvements
+
+Version 6.14.5 *(2020-04-26)*
+----------------------------
+
+ * Disable Portrait photo showing by default, until it gets improved
+ * Added a couple other performance improvements here and there
+
+Version 6.14.4 *(2020-04-24)*
+----------------------------
+
+ * Improved the performance on multiple places
+ * Removed some unnecessary permissions added recently
+ * Fixed some photo editor glitches
+ * Show Portrait images by default only on Android 9+
+
+Version 6.14.3 *(2020-04-21)*
+----------------------------
+
+ * Use the selected date format grouped thumbnail section titles too
+ * Fixed a glitch related to locked folders asking authentication too often
+ * Refresh the UI here and there a bit
+
+Version 6.14.2 *(2020-04-18)*
+----------------------------
+
+ * Fixed some Photo Editor bugs
+ * Properly handle locked folders at opening from widgets and shortcuts
+ * Open the map at clicking the coordinates at the Properties window
+ * Properly sort items at the Other Folder dialog at copy/move
+ * Fixed some folder un/hiding related glitches
+ * A couple other translation and UX improvements
+
 Version 6.14.1 *(2020-04-14)*
 ----------------------------
 
